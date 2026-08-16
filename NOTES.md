@@ -136,3 +136,19 @@ Hard-won findings. Re-verify before changing the code that depends on them.
 - **The panel writes credentials over stdin, never argv.** `rpc.py --save`
   reads one JSON object from stdin, so the secret never appears in a command
   line or in `ps`. Same validation as `--setup`, including the Public Key check.
+- **Omarchy's label casing, read off the shipped panels.** Section headers are
+  ALL CAPS (`RECENT FILES`, `EXIT NODES`, `OUTPUT`, `POWER PROFILE`). Row,
+  action and info labels are sentence case (`Stored`, `Battery size`, `Forget
+  network`, `Show QR code`, `Run a speed test`), with proper nouns and acronyms
+  kept (`Copy IP`, `IP Address`). This plugin follows that: `RAM usage`,
+  `Mic gain`, `Discord volume`, `Set up voice controls`, `Open portal`. The two
+  exceptions are `Client ID` and `Client Secret`, which are Title Case because
+  they have to match the labels Discord's own portal prints.
+- **Row metrics that make a panel look native**: outer column
+  `Style.space(12)`, section header to rows `Style.space(10)`, row to row
+  `Style.space(6)`, row side margins `Style.space(10)`, inside a row
+  `Style.space(8)`, row height `content + Style.spacing.rowPaddingX`. Labels are
+  `Style.font.body`, sub-labels `Style.font.caption`, info pairs
+  `Style.font.bodySmall`, glyphs `Style.font.icon`. Leading glyphs still drift a few
+  pixels between rows because side bearings differ per glyph; first-party has
+  the same drift and only corrects it for bar icons, via `OpticalGlyph`.

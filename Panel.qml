@@ -455,12 +455,13 @@ Panel {
                   wrapMode: Text.WordWrap
                 }
 
+                // Meant to be read and copied, so it gets the readable size.
                 Text {
                   width: setupForm.fieldWidth
                   text: root.redirectUri
                   color: root.foreground
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption
+                  font.pixelSize: Style.font.bodySmall
                   elide: Text.ElideRight
                 }
 
@@ -605,7 +606,16 @@ Panel {
       anchors.verticalCenter: parent.verticalCenter
       anchors.leftMargin: Style.space(10)
       anchors.rightMargin: Style.space(10)
-      spacing: Style.space(6)
+      spacing: Style.space(8)
+
+      Text {
+        text: Model.pingGlyph(root.pingQuality)
+        color: root.pingQuality === "poor" ? root.urgent
+          : (root.pingQuality === "good" ? root.foreground : root.dim)
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.icon
+        Layout.alignment: Qt.AlignVCenter
+      }
 
       ColumnLayout {
         Layout.fillWidth: true
@@ -650,15 +660,6 @@ Panel {
         }
       }
 
-      Text {
-        text: Model.pingGlyph(root.pingQuality)
-        color: root.pingQuality === "poor" ? root.urgent
-          : (root.pingQuality === "good" ? root.foreground : root.dim)
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.icon
-        Layout.alignment: Qt.AlignVCenter
-        Layout.rightMargin: Style.space(2)
-      }
 
       CallButton {
         kind: "mic"
