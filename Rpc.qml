@@ -10,6 +10,9 @@ Item {
   property bool active: false
 
   readonly property int restartDelayMs: 4000
+  // A bridge that cannot start stops being retried, rather than respawning python3 forever.
+  readonly property int maxRestarts: 5
+  property int restarts: 0
   // rpc.py exits 2 when no credentials exist, which no amount of retrying fixes.
   readonly property int exitUnconfigured: 2
 
@@ -29,7 +32,8 @@ Item {
   property int ping: 0
   property string voiceState: ""
 
-  readonly property bool connected: ready && error === ""
+  // Not error === "": rpc.py warns on stderr about refusals it survives, and a warning is not a disconnect.
+  readonly property bool connected: ready
   readonly property bool inVoice: connected && channel !== ""
 
   // Cleared while the bridge is down so the panel never shows a stale call.
@@ -46,6 +50,7 @@ Item {
   function retry() {
     configured = true
     error = ""
+    restarts = 0
     holdOff = false
   }
 
@@ -82,6 +87,7 @@ Item {
     root.ping = Math.round(Number(state.ping) || 0)
     root.voiceState = String(state.voiceState || "")
     root.ready = true
+    root.restarts = 0
   }
 
   // Held down for one delay after a crash so a failing bridge cannot hot-loop.
@@ -97,7 +103,7 @@ Item {
       onRead: function (line) { root.applyLine(line) }
     }
 
-    // The bridge reports its own failures as JSON, so stderr is a crash.
+    // Fatal failures arrive as JSON on stdout, so a line here is a warning worth showing.
     stderr: SplitParser {
       onRead: function (line) {
         var text = String(line).trim()
@@ -109,6 +115,11 @@ Item {
 
     onExited: function (exitCode) {
       if (exitCode === root.exitUnconfigured) return
+      root.restarts += 1
+      if (root.restarts > root.maxRestarts) {
+        root.error = "Discord voice bridge keeps failing, see the shell log"
+        return
+      }
       root.holdOff = true
       restartTimer.restart()
     }

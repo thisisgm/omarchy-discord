@@ -115,10 +115,14 @@ Item {
     else launch()
   }
 
+  // ps always reports one Discord without --type=, so no main pid means the parse failed.
   function quit() {
     if (!running) return
-    if (mainPid > 0) Util.execDetached("kill " + mainPid)
-    else Util.execDetached("pkill -x Discord")
+    if (mainPid === 0) {
+      lastError = "Could not find the main Discord process to quit"
+      return
+    }
+    Util.execDetached("kill " + mainPid)
     settle()
   }
 
