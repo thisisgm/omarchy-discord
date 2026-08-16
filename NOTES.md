@@ -94,3 +94,16 @@ Hard-won findings. Re-verify before changing the code that depends on them.
   verifying interaction webhook signatures — exactly 64 hex characters, useless
   here, and the easy thing to paste by mistake, so `--setup` detects that shape
   and says so instead of failing later inside the token exchange.
+- **Discord's token endpoint 403s the default Python user agent.** `urllib`
+  sends `Python-urllib/3.x` and Discord's edge answers a bare `403 Forbidden`
+  with no body hint. Setting any identifying `User-Agent` fixes it; this was the
+  last thing standing between a working AUTHORIZE and a token.
+- **Subscribing is `{"cmd":"SUBSCRIBE","evt":"<EVENT>"}`**, not the event as the
+  command. Getting it backwards returns `Invalid command: VOICE_SETTINGS_UPDATE`.
+- **RPC AUTHORIZE must NOT carry a `redirect_uri`** — it answers `Redirect URI
+  cannot be used in the RPC OAuth2 Authorization flow`. Discord picks the one
+  registered on the application, so `Missing "redirect_uri" in request` from
+  AUTHORIZE means the app has *none* registered, not that the call omitted it.
+  The HTTP token exchange still has to name it. Both errors observed live.
+- **Only three scopes are needed and granted**: `rpc`, `rpc.voice.read`,
+  `rpc.voice.write`. The token carries a refresh token and a 7-day expiry.

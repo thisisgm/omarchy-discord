@@ -11,13 +11,15 @@ Check it by hand with:  python3 rpc.py --probe
 """
 
 import json, os, signal, socket, struct, subprocess, sys, threading, time
-import urllib.parse, urllib.request
+import urllib.error, urllib.parse, urllib.request
 
 OP_HANDSHAKE, OP_FRAME, OP_CLOSE, OP_PING, OP_PONG = 0, 1, 2, 3, 4
 
 HEADER = struct.Struct("<II")
 API = "https://discord.com/api"
 PORTAL = "https://discord.com/developers/applications"
+# Discord's edge answers the default Python user agent with a bare 403.
+USER_AGENT = "omarchy-discord (https://github.com/thisisgm/omarchy-discord, 1.0)"
 SCOPES = ["rpc", "rpc.voice.read", "rpc.voice.write"]
 REDIRECT_URI = "http://localhost/omarchy-discord"
 
@@ -137,10 +139,20 @@ def post_token(client_id, client_secret, fields):
     request = urllib.request.Request(
         API + "/oauth2/token",
         data=urllib.parse.urlencode(body).encode(),
-        headers={"Content-Type": "application/x-www-form-urlencoded"})
+        headers={"Content-Type": "application/x-www-form-urlencoded",
+                 "User-Agent": USER_AGENT})
     try:
         with urllib.request.urlopen(request, timeout=15) as response:
             token = json.load(response)
+    except urllib.error.HTTPError as error:
+        # The body names the actual problem; the status alone never does.
+        detail = ""
+        try:
+            detail = error.read().decode("utf-8", "replace").strip()[:200]
+        except OSError:
+            pass
+        raise RpcError("Discord token request failed: HTTP %d %s"
+                       % (error.code, detail))
     except Exception as error:
         raise RpcError("Discord token request failed: %s" % error)
     if "access_token" not in token:
@@ -190,6 +202,12 @@ class Rpc:
             frame["evt"] = evt
         self.send(OP_FRAME, frame)
         return nonce
+
+    def subscribe(self, event, args=None):
+        return self.request("SUBSCRIBE", args, evt=event)
+
+    def unsubscribe(self, event, args=None):
+        return self.request("UNSUBSCRIBE", args, evt=event)
 
     def request(self, cmd, args=None, evt=None):
         """Send a command and pump frames until its own reply arrives."""
@@ -315,12 +333,11 @@ class Bridge:
         for event in ("SPEAKING_START", "SPEAKING_STOP"):
             if self.subscribed_channel:
                 try:
-                    self.rpc.request(event, {"channel_id": self.subscribed_channel},
-                                     evt="UNSUBSCRIBE")
+                    self.rpc.unsubscribe(event, {"channel_id": self.subscribed_channel})
                 except RpcError:
                     pass
             if channel_id:
-                self.rpc.request(event, {"channel_id": channel_id}, evt="SUBSCRIBE")
+                self.rpc.subscribe(event, {"channel_id": channel_id})
         self.subscribed_channel = channel_id
 
     def handle_event(self, event, data):
@@ -364,7 +381,7 @@ class Bridge:
 
     def run(self):
         for event in ("VOICE_SETTINGS_UPDATE", "VOICE_CHANNEL_SELECT"):
-            self.rpc.request(event, evt="SUBSCRIBE")
+            self.rpc.subscribe(event)
         self.refresh()
         threading.Thread(target=self.read_commands, daemon=True).start()
         while True:
@@ -453,8 +470,16 @@ def open_portal():
         pass
 
 
-def setup():
-    """Register the application, save the pair, and prove the tier end to end."""
+def collect_credentials():
+    """Reuse what is already saved, or walk through registering an application."""
+    stored = read_credentials_file()
+    client_id = str(stored.get("client_id", ""))
+    client_secret = str(stored.get("client_secret", ""))
+    if client_id and client_secret:
+        print("Using the application already saved in %s." % CREDENTIALS_PATH)
+        print("Delete that file to enter a different one.\n")
+        return client_id, client_secret
+
     print("Discord refuses anonymous clients, so the voice controls need an")
     print("application of your own. This is the only setup, and it is one time.\n")
     print("1. Create an application, any name, at:")
@@ -469,21 +494,30 @@ def setup():
     client_id = ask("Client ID (a long number):     ")
     if not client_id.isdigit():
         print("\nThat is not the Client ID — it is a long number, digits only.")
-        return 1
+        return None
     client_secret = ask("Client Secret (OAuth2 page):   ")
     if not client_secret:
         print("\nNo client secret given.")
-        return 1
+        return None
     # The Public Key is an Ed25519 key: 32 bytes, so exactly 64 hex characters.
     if len(client_secret) == PUBLIC_KEY_LENGTH and all(c in HEX_DIGITS for c in client_secret):
         print("\nThat is the Public Key, not the Client Secret — it signs")
         print("interaction webhooks and cannot buy a token. The secret is on")
         print("the OAuth2 page, behind Reset Secret.")
-        return 1
+        return None
 
     write_private(CREDENTIALS_PATH, {"client_id": client_id,
                                      "client_secret": client_secret})
     print("\nSaved to %s, readable only by you." % CREDENTIALS_PATH)
+    return client_id, client_secret
+
+
+def setup():
+    """Get the application, then prove the whole tier end to end."""
+    pair = collect_credentials()
+    if pair is None:
+        return 1
+    client_id, client_secret = pair
 
     try:
         rpc = Rpc(connect_socket())
@@ -502,9 +536,18 @@ def setup():
         return 0
     except RpcError as error:
         print("Discord refused: %s\n" % error)
-        print("Check the redirect URI is exactly %s." % REDIRECT_URI)
-        print("If the application is not yours, your account must be on its")
-        print("App Testers list; the owner is already covered.")
+        if "redirect_uri" in str(error):
+            print("That means the application has no redirect URI registered —")
+            print("Discord has none to fall back on. On its OAuth2 page, under")
+            print("Redirects, Add Redirect and paste exactly:")
+            print("     %s" % REDIRECT_URI)
+            print("then click Save Changes. The portal keeps that button in a")
+            print("bar at the bottom and discards the entry without it.")
+            print("Run this again afterwards; it reuses what you already saved.")
+        else:
+            print("Check the redirect URI is exactly %s." % REDIRECT_URI)
+            print("If the application is not yours, your account must be on its")
+            print("App Testers list; the owner is already covered.")
         return 1
     finally:
         rpc.close()
