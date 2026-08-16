@@ -73,8 +73,8 @@ Item {
     if (!state) return
 
     if (state.ok === false) {
-      // The bridge says outright when it can never work, so stop rather than retry.
-      if (state.configured === false) root.configured = false
+      // Only the unconfigured line says the tier can never work; any other error got past that check.
+      root.configured = state.configured !== false
       root.probing = false
       root.error = String(state.error || "Discord RPC failed")
       root.ready = false
@@ -96,13 +96,14 @@ Item {
     root.restarts = 0
   }
 
-  // Held down for one delay after a crash so a failing bridge cannot hot-loop.
+  // Blocks the next start: one delay after a crash, or until retry() once the budget is spent.
   property bool holdOff: false
 
   // A fresh Discord is a fresh chance, so no failure state outlives the process it belonged to.
   onActiveChanged: if (!active) {
     holdOff = false
     restarts = 0
+    error = ""
   }
 
   Process {
@@ -127,10 +128,14 @@ Item {
 
     onExited: function (exitCode) {
       // Discord quitting takes the bridge with it, and that is not a failure to count.
-      if (!root.active || exitCode === root.exitUnconfigured) return
+      if (!root.active || exitCode === root.exitUnconfigured) {
+        root.probing = false
+        return
+      }
       root.holdOff = true
+      root.probing = false
       root.restarts += 1
-      // Past the budget the hold is never lifted, so only retry() starts the bridge again.
+      // Past the budget the hold stays until retry() or the next Discord lifts it.
       if (root.restarts > root.maxRestarts) {
         root.error = "Discord voice bridge keeps failing, see the shell log"
         return
