@@ -199,7 +199,7 @@ Panel {
     anchors.fill: parent
     bar: root.bar
     active: discord.attention
-    tooltipText: "Discord — " + discord.statusText
+    tooltipText: "Discord: " + discord.statusText
 
     iconComponent: Component {
       Item {

@@ -10,7 +10,7 @@ Set it up with:         python3 rpc.py --setup
 Check it by hand with:  python3 rpc.py --probe
 """
 
-import json, os, signal, socket, struct, subprocess, sys, threading, time
+import json, os, queue, select, signal, socket, struct, subprocess, sys, threading, time
 import urllib.error, urllib.parse, urllib.request
 
 OP_HANDSHAKE, OP_FRAME, OP_CLOSE, OP_PING, OP_PONG = 0, 1, 2, 3, 4
@@ -29,6 +29,8 @@ TOKEN_MODE = 0o600
 TOKEN_DIR_MODE = 0o700
 REFRESH_MARGIN_SEC = 300
 RECONNECT_DELAY_SEC = 5
+# The receive loop wakes this often to run queued commands.
+SOCKET_POLL_SEC = 0.2
 # Discord pings several times a second; a bar only cares about the coarse value.
 PING_ROUND_MS = 10
 SECRETS_READ_TIMEOUT_SEC = 5
@@ -47,8 +49,32 @@ SECRETS_PATH = os.environ.get("OMARCHY_DISCORD_SECRETS",
                               os.path.expanduser("~/.claude/secrets/.env"))
 
 
+COMMANDS = queue.Queue()
+
+
 class RpcError(Exception):
     """Carries a message meant for the user, not a stack trace."""
+
+
+def warn(message):
+    sys.stderr.write("omarchy-discord: %s\n" % message)
+    sys.stderr.flush()
+
+
+def as_number(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def start_stdin_reader():
+    """One reader for the whole process, so a reconnect cannot orphan a line."""
+    def pump():
+        for line in sys.stdin:
+            COMMANDS.put(line)
+
+    threading.Thread(target=pump, daemon=True).start()
 
 
 # lines look like "DISCORD_CLIENT_ID=1234567890", values never evaluated
@@ -82,12 +108,12 @@ def read_secrets_file(path):
 
 def write_private(path, payload):
     """Write JSON readable only by its owner, and never briefly wider."""
-    directory = os.path.dirname(path)
-    os.makedirs(directory, mode=TOKEN_DIR_MODE, exist_ok=True)
+    os.makedirs(os.path.dirname(path), mode=TOKEN_DIR_MODE, exist_ok=True)
     temporary = path + ".tmp"
-    with open(temporary, "w") as handle:
+    # O_CREAT with the mode, so the secret is never on disk world-readable.
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, TOKEN_MODE)
+    with os.fdopen(descriptor, "w") as handle:
         json.dump(payload, handle)
-    os.chmod(temporary, TOKEN_MODE)
     os.replace(temporary, path)
 
 
@@ -113,7 +139,7 @@ def credentials():
         client_id = client_id or secrets.get("DISCORD_CLIENT_ID", "")
         client_secret = client_secret or secrets.get("DISCORD_CLIENT_SECRET", "")
     if not client_id or not client_secret:
-        raise RpcError("Discord voice controls are not set up yet — run: "
+        raise RpcError("Discord voice controls are not set up yet, run: "
                        "python3 %s --setup" % os.path.abspath(__file__))
     return client_id.strip(), client_secret.strip()
 
@@ -127,13 +153,7 @@ def load_token():
 
 
 def save_token(token):
-    os.makedirs(STATE_DIR, mode=TOKEN_DIR_MODE, exist_ok=True)
-    # chmod before the rename, so the token is never briefly world-readable
-    temporary = TOKEN_PATH + ".tmp"
-    with open(temporary, "w") as handle:
-        json.dump(token, handle)
-    os.chmod(temporary, TOKEN_MODE)
-    os.replace(temporary, TOKEN_PATH)
+    write_private(TOKEN_PATH, token)
 
 
 def post_token(client_id, client_secret, fields):
@@ -169,6 +189,7 @@ class Rpc:
         self.sock = sock
         self.lock = threading.Lock()
         self.nonce = 0
+        self.deferred = []
 
     def close(self):
         try:
@@ -181,9 +202,18 @@ class Rpc:
         with self.lock:
             self.sock.sendall(HEADER.pack(op, len(blob)) + blob)
 
+    # frames are 4 bytes little-endian opcode, 4 bytes little-endian length,
+    # then that many bytes of JSON: 01 00 00 00 12 00 00 00 {"cmd":"DISPATCH"...}
     def recv(self):
         op, length = HEADER.unpack(self._read_exactly(HEADER.size))
         return op, json.loads(self._read_exactly(length).decode())
+
+    def readable(self, timeout):
+        return bool(select.select([self.sock], [], [], timeout)[0])
+
+    def take_deferred(self):
+        events, self.deferred = self.deferred, []
+        return events
 
     def _read_exactly(self, count):
         chunks = b""
@@ -222,6 +252,9 @@ class Rpc:
                 self.send(OP_PONG, payload)
                 continue
             if payload.get("nonce") != nonce:
+                # An event that lands mid-request is still owed to the caller.
+                if payload.get("cmd") == "DISPATCH":
+                    self.deferred.append(payload)
                 continue
             if payload.get("evt") == "ERROR":
                 raise RpcError((payload.get("data") or {}).get("message", "RPC error"))
@@ -372,16 +405,38 @@ class Bridge:
         try:
             message = json.loads(line)
         except ValueError:
+            warn("ignored a command that is not JSON: %r" % line.strip()[:80])
             return
         name, value = message.get("cmd"), message.get("value")
         if name in ("mute", "deaf"):
             self.rpc.command("SET_VOICE_SETTINGS", {name: bool(value)})
         elif name == "inputVolume":
-            self.rpc.command("SET_VOICE_SETTINGS", {"input": {"volume": float(value)}})
+            volume = as_number(value)
+            if volume is None:
+                warn("inputVolume needs a number, got %r" % (value,))
+                return
+            self.rpc.command("SET_VOICE_SETTINGS", {"input": {"volume": volume}})
         elif name == "disconnect":
             self.rpc.command("SELECT_VOICE_CHANNEL", {"channel_id": None, "force": True})
         elif name == "refresh":
             self.refresh()
+        else:
+            warn("unknown command %r" % (name,))
+
+    def drain_commands(self):
+        while True:
+            try:
+                line = COMMANDS.get_nowait()
+            except queue.Empty:
+                return
+            self.handle_command(line)
+
+    def drain_deferred(self):
+        changed = False
+        for payload in self.rpc.take_deferred():
+            if self.handle_event(payload.get("evt"), payload.get("data") or {}):
+                changed = True
+        return changed
 
     def refresh(self):
         self.apply_voice_settings(self.rpc.request("GET_VOICE_SETTINGS"))
@@ -389,13 +444,18 @@ class Bridge:
         self.select_channel(selected.get("id") if selected else None)
         self.emit()
 
+    # This thread owns the socket outright; nothing else reads or writes it.
     def run(self):
         for event in ("VOICE_SETTINGS_UPDATE", "VOICE_CHANNEL_SELECT",
                       "VOICE_CONNECTION_STATUS"):
             self.rpc.subscribe(event)
         self.refresh()
-        threading.Thread(target=self.read_commands, daemon=True).start()
         while True:
+            self.drain_commands()
+            if self.drain_deferred():
+                self.emit()
+            if not self.rpc.readable(SOCKET_POLL_SEC):
+                continue
             op, payload = self.rpc.recv()
             if op == OP_CLOSE:
                 raise RpcError(payload.get("message", "Discord closed the connection"))
@@ -405,13 +465,6 @@ class Bridge:
             if payload.get("cmd") == "DISPATCH" and self.handle_event(
                     payload.get("evt"), payload.get("data") or {}):
                 self.emit()
-
-    def read_commands(self):
-        for line in sys.stdin:
-            try:
-                self.handle_command(line)
-            except (RpcError, OSError, ValueError):
-                return
 
 
 def emit_error(message, configured=True):
@@ -527,12 +580,12 @@ def collect_credentials():
     print("     %s" % REDIRECT_URI)
     print("3. Copy CLIENT ID and CLIENT SECRET from that same OAuth2 page.")
     print("   Reset Secret reveals the secret. Do not use the Public Key on")
-    print("   General Information — that one signs webhooks and will not work.\n")
+    print("   General Information, which signs webhooks and will not work.\n")
     open_portal()
 
     client_id = ask("Client ID (a long number):     ")
     if not client_id.isdigit():
-        print("\nThat is not the Client ID — it is a long number, digits only.")
+        print("\nThat is not the Client ID. It is a long number, digits only.")
         return None
     client_secret = ask("Client Secret (OAuth2 page):   ")
     if not client_secret:
@@ -540,7 +593,7 @@ def collect_credentials():
         return None
     # The Public Key is an Ed25519 key: 32 bytes, so exactly 64 hex characters.
     if looks_like_public_key(client_secret):
-        print("\nThat is the Public Key, not the Client Secret — it signs")
+        print("\nThat is the Public Key, not the Client Secret. It signs")
         print("interaction webhooks and cannot buy a token. The secret is on")
         print("the OAuth2 page, behind Reset Secret.")
         return None
@@ -561,7 +614,7 @@ def setup():
     try:
         rpc = Rpc(connect_socket())
     except RpcError as error:
-        print("%s — start Discord and run this again." % error)
+        print("%s. Start Discord and run this again." % error)
         return 1
 
     print("Discord will now ask you to authorize it. Approve that prompt.\n")
@@ -569,14 +622,14 @@ def setup():
         ready = handshake(rpc, client_id)
         token = valid_token(client_id, client_secret) or authorize(rpc, client_id, client_secret)
         rpc.request("AUTHENTICATE", {"access_token": token["access_token"]})
-        print("Ready — authenticated as %s."
+        print("Ready. Authenticated as %s."
               % (ready.get("user") or {}).get("username", "your account"))
         print("Open the Discord panel in the bar and the call controls are there.")
         return 0
     except RpcError as error:
         print("Discord refused: %s\n" % error)
         if "redirect_uri" in str(error):
-            print("That means the application has no redirect URI registered —")
+            print("That means the application has no redirect URI registered,")
             print("Discord has none to fall back on. On its OAuth2 page, under")
             print("Redirects, Add Redirect and paste exactly:")
             print("     %s" % REDIRECT_URI)
@@ -605,6 +658,7 @@ def main():
     except RpcError as error:
         emit_error(error, configured=False)
         return EXIT_UNCONFIGURED
+    start_stdin_reader()
     while True:
         try:
             session()

@@ -2,9 +2,7 @@ import QtQuick
 import Quickshell.Io
 import "Model.js" as Model
 
-// Discord's own voice state — the channel you are in, its mute and deafen, and
-// who is talking — which PipeWire cannot see. rpc.py owns Discord's binary
-// socket and speaks one JSON object per line; NOTES.md says why it needs an app.
+// rpc.py owns Discord's binary socket and speaks one JSON object per line.
 Item {
   id: root
 

@@ -160,9 +160,7 @@ function callPlace(channel, guild) {
 
 // ---------------------------------------------------------------- signal
 
-// Discord paints call quality green, yellow and red. Omarchy's palette is
-// foreground, muted and urgent, so quality reads as glyph strength first and
-// colour second — the same bars the network panel already uses.
+// Omarchy has no green or yellow, so quality is glyph strength first (NOTES.md).
 var PING_GOOD_MS = 100
 var PING_FAIR_MS = 250
 
