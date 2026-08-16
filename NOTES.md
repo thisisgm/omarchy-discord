@@ -71,3 +71,19 @@ Hard-won findings. Re-verify before changing the code that depends on them.
   the power panel draws shutdown and reboot in plain `foreground`. Action rows
   here follow that: state can be urgent (muted, deafened, wants attention), a
   button caption cannot.
+- **First-party panel metrics, copied deliberately.** Dropbox, Tailscale and
+  Agents all set `contentWidth: Style.space(380)` (this panel was 360) and all
+  space a section as header → `Style.space(10)` → rows, with `Style.space(6)`
+  between rows; the outer column is `Style.space(12)` and rows inset
+  `Style.space(10)` with `Style.spacing.rowPaddingX` height. Verified after the
+  change by screenshotting this panel and Tailscale's at the same origin: both
+  borders land on x=132.
+- **`ipcTarget` is deliberately short.** First-party panels use their module id
+  (`omarchy.tailscale`), which would make this `omarchy-shell
+  io.github.thisisgm.discord raise`. `discord` is what the README documents and
+  what a keybinding wants; the collision risk is worth the usability.
+- **`AppLibrary` is not the launch path to use.** `shell.appLibrary.launch()`
+  runs exactly the `uwsm-app -- gtk-launch <id>.desktop` this plugin already
+  runs, plus a launch OSD, but it is a private injection documented for the
+  menu's Apps submenu and no plugin under `plugins/` consumes it. Depending on
+  it would be less conventional, not more.

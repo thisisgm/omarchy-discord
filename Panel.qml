@@ -199,7 +199,7 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(360))
+    contentWidth: panel.fittedContentWidth(Style.space(380))
     contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(560))
 
     PanelKeyCatcher {
@@ -290,27 +290,10 @@ Panel {
             elide: Text.ElideRight
           }
 
-          Row {
+          InfoPair {
             visible: discord.running
-            width: parent.width
-
-            Text {
-              text: "Footprint"
-              color: root.foreground
-              opacity: 0.6
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.bodySmall
-            }
-
-            Text {
-              width: parent.width - parent.children[0].implicitWidth
-              text: Model.formatFootprint(discord.memoryMib, discord.processCount)
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.bodySmall
-              horizontalAlignment: Text.AlignRight
-              elide: Text.ElideRight
-            }
+            label: "Footprint"
+            value: Model.formatFootprint(discord.memoryMib, discord.processCount)
           }
 
           PanelSeparator {
@@ -321,7 +304,7 @@ Panel {
           Column {
             visible: discord.inVoice || discord.hasPlayback
             width: parent.width
-            spacing: Style.space(6)
+            spacing: Style.space(10)
 
             PanelSectionHeader {
               text: discord.inVoice ? "VOICE CALL" : "AUDIO"
@@ -330,14 +313,13 @@ Panel {
             }
 
             // Not a cursor stop: it reports, it does not do anything.
-            Row {
+            RowLayout {
               visible: root.callControls && discord.rpc.speaking.length > 0
               width: parent.width
-              leftPadding: Style.space(10)
-              rightPadding: Style.space(10)
               spacing: Style.space(8)
 
               Text {
+                Layout.leftMargin: Style.space(10)
                 text: "󰗋"
                 color: root.foreground
                 font.family: root.fontFamily
@@ -345,7 +327,8 @@ Panel {
               }
 
               Text {
-                width: parent.width - parent.leftPadding - parent.rightPadding - Style.space(8) - parent.children[0].implicitWidth
+                Layout.fillWidth: true
+                Layout.rightMargin: Style.space(10)
                 text: discord.rpc.speaking.join(", ")
                 color: root.dim
                 font.family: root.fontFamily
@@ -354,34 +337,39 @@ Panel {
               }
             }
 
-            MicRow {
-              visible: discord.hasMicControl
+            Column {
               width: parent.width
-            }
+              spacing: Style.space(6)
 
-            DeafenRow {
-              visible: root.callControls
-              width: parent.width
-            }
+              MicRow {
+                visible: discord.hasMicControl
+                width: parent.width
+              }
 
-            GainRow {
-              visible: root.callControls
-              width: parent.width
-            }
+              DeafenRow {
+                visible: root.callControls
+                width: parent.width
+              }
 
-            VolumeRow {
-              visible: discord.hasPlayback
-              width: parent.width
-            }
+              GainRow {
+                visible: root.callControls
+                width: parent.width
+              }
 
-            ActionRow {
-              visible: root.callControls
-              width: parent.width
-              kind: "hangup"
-              glyph: "󰏵"
-              label: "Leave call"
-              sub: Model.callPlace(discord.callChannel, discord.callGuild)
-              onTriggered: discord.hangUp()
+              VolumeRow {
+                visible: discord.hasPlayback
+                width: parent.width
+              }
+
+              ActionRow {
+                visible: root.callControls
+                width: parent.width
+                kind: "hangup"
+                glyph: "󰏵"
+                label: "Leave call"
+                sub: Model.callPlace(discord.callChannel, discord.callGuild)
+                onTriggered: discord.hangUp()
+              }
             }
           }
 
@@ -390,9 +378,8 @@ Panel {
           }
 
           Column {
-            id: actionColumn
             width: parent.width
-            spacing: Style.space(6)
+            spacing: Style.space(10)
 
             PanelSectionHeader {
               visible: discord.hasWindow
@@ -401,37 +388,43 @@ Panel {
               fontFamily: root.fontFamily
             }
 
-            Repeater {
-              model: discord.windows
+            Column {
+              id: actionColumn
+              width: parent.width
+              spacing: Style.space(6)
 
-              WindowRow {
-                required property var modelData
-                required property int index
-                width: actionColumn.width
-                toplevel: modelData
-                windowIndex: index
+              Repeater {
+                model: discord.windows
+
+                WindowRow {
+                  required property var modelData
+                  required property int index
+                  width: actionColumn.width
+                  toplevel: modelData
+                  windowIndex: index
+                }
               }
-            }
 
-            ActionRow {
-              visible: !discord.hasWindow
-              width: parent.width
-              kind: "open"
-              glyph: "󰍹"
-              label: discord.running ? "Show Discord" : "Start Discord"
-              sub: discord.running ? "Running with no window — ask it to open one" : "Launch the desktop app"
-              actionEnabled: discord.installed
-              onTriggered: { discord.open(); root.close() }
-            }
+              ActionRow {
+                visible: !discord.hasWindow
+                width: parent.width
+                kind: "open"
+                glyph: "󰍹"
+                label: discord.running ? "Show Discord" : "Start Discord"
+                sub: discord.running ? "Running with no window — ask it to open one" : "Launch the desktop app"
+                actionEnabled: discord.installed
+                onTriggered: { discord.open(); root.close() }
+              }
 
-            ActionRow {
-              visible: discord.running
-              width: parent.width
-              kind: "quit"
-              glyph: "󰐥"
-              label: "Quit Discord"
-              sub: Model.formatMemory(discord.memoryMib) + " back"
-              onTriggered: discord.quit()
+              ActionRow {
+                visible: discord.running
+                width: parent.width
+                kind: "quit"
+                glyph: "󰐥"
+                label: "Quit Discord"
+                sub: Model.formatMemory(discord.memoryMib) + " back"
+                onTriggered: discord.quit()
+              }
             }
           }
         }
@@ -440,6 +433,35 @@ Panel {
   }
 
   // ------------------------------------------------------------ components
+
+  // The Dropbox panel's label/value pair, laid out with the row layout this
+  // file already imports instead of a hand-measured spacer.
+  component InfoPair: RowLayout {
+    id: infoPair
+    property string label: ""
+    property string value: ""
+
+    width: parent.width
+    spacing: Style.space(8)
+
+    Text {
+      text: infoPair.label
+      color: root.foreground
+      opacity: 0.6
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.bodySmall
+    }
+
+    Text {
+      Layout.fillWidth: true
+      text: infoPair.value
+      color: root.foreground
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.bodySmall
+      horizontalAlignment: Text.AlignRight
+      elide: Text.ElideRight
+    }
+  }
 
   component MicRow: CursorSurface {
     id: micRow

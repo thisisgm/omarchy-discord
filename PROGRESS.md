@@ -41,6 +41,27 @@ user every upstream tray fix. The `hidden` list is the shell's own affordance
 for exactly this and is one right-click to undo. README documents the manual
 route so the plugin is correct for anyone else installing it.
 
+## Phase 1.2 — first-party polish pass: DONE, verified live
+
+Measured against Dropbox, Tailscale and Agents rather than guessed:
+
+- Panel width 360 → **380**, the constant all three first-party panels use.
+  Confirmed by screenshotting this panel and Tailscale's at one origin: both
+  borders land on x=132.
+- Section rhythm now matches theirs — header, `Style.space(10)`, then rows at
+  `Style.space(6)` — where this panel had a flat 6 and read cramped.
+- The hand-measured `Footprint` row became an `InfoPair`, the label/value shape
+  Dropbox uses, dropping a `parent.children[0].implicitWidth` calculation. The
+  speaking line lost the same kind of arithmetic for a `RowLayout`.
+- The quit row drew a filled close-circle in `urgent`, the only saturated shape
+  in a panel of thin line art. Omarchy spends `urgent` on errors and attention
+  and draws shutdown in plain `foreground`, so it is now the power glyph in
+  `foreground`. State keeps its colour; captions do not.
+
+Kept on purpose: the single `hideWhenStopped` setting (both first-party panels
+expose a `refreshIntervalSec` knob; this one polls on a named 20s constant and
+does not need it), and the short `ipcTarget`. Both noted in `NOTES.md`.
+
 ## Phase 2 — Discord RPC: built and wired, awaiting credentials
 
 `rpc.py` is complete and syntax-clean. It owns Discord's binary RPC socket and
