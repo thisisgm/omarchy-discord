@@ -20,7 +20,7 @@ Item {
   readonly property string scriptPath: String(Qt.resolvedUrl("rpc.py")).replace("file://", "")
 
   property bool configured: true
-  // Lets one spawn through while unconfigured, so the panel keeps showing setup until the bridge answers.
+  // Lets the bridge start while unconfigured, until it answers, so the panel keeps showing setup meanwhile.
   property bool probing: false
   property bool ready: false
   property string error: ""
@@ -128,12 +128,8 @@ Item {
 
     onExited: function (exitCode) {
       // Discord quitting takes the bridge with it, and that is not a failure to count.
-      if (!root.active || exitCode === root.exitUnconfigured) {
-        root.probing = false
-        return
-      }
+      if (!root.active || exitCode === root.exitUnconfigured) return
       root.holdOff = true
-      root.probing = false
       root.restarts += 1
       // Past the budget the hold stays until retry() or the next Discord lifts it.
       if (root.restarts > root.maxRestarts) {
