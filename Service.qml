@@ -6,8 +6,7 @@ import Quickshell.Services.Pipewire
 import qs.Commons
 import "Model.js" as Model
 
-// Discord's state, read from the services the shell already runs. See README
-// for which service answers which question.
+// Discord's state from the services the shell already runs; README maps signal to service.
 Item {
   id: root
 
@@ -39,8 +38,7 @@ Item {
   readonly property var primaryWindow: hasWindow ? windows[0] : null
   readonly property string workspace: Model.workspaceLabel(primaryWindow)
 
-  // Only exists while Discord has a window; a tray-hidden instance has nothing
-  // for the compositor to flag.
+  // Only while Discord has a window; a tray-hidden instance has nothing to flag.
   readonly property bool attention: Model.anyUrgent(windows)
 
   // ------------------------------------------------------------ voice
@@ -50,13 +48,11 @@ Item {
   readonly property var captureNode: Model.findDiscordStream(streamNodes, false)
   readonly property var playbackNode: Model.findDiscordStream(streamNodes, true)
 
-  // The voice engine holds streams only while connected to a call; the bridge
-  // names the call outright when it is configured.
+  // The voice engine holds streams only in a call; the bridge names the call outright.
   readonly property bool inVoice: bridge.inVoice || Model.hasVoiceStream(streamNodes)
   readonly property bool hasPlayback: playbackNode !== null
 
-  // Discord's own voice state, when a registered application is configured.
-  // Every property below falls back to PipeWire when it is not.
+  // Discord's own voice state when configured; every property below falls back to PipeWire.
   Rpc {
     id: bridge
     active: root.running
@@ -67,9 +63,7 @@ Item {
   readonly property string callChannel: bridge.channel
   readonly property string callGuild: bridge.guild
 
-  // Discord's own mute is the truth whenever the bridge is up. Without it the
-  // capture stream is all there is, and Discord drops that stream while the
-  // microphone is closed, so there is nothing to mute until it comes back.
+  // Without the bridge the capture stream is all there is, and Discord drops it while muted.
   readonly property bool hasMicControl: voiceKnown || captureNode !== null
   readonly property bool micMuted: voiceKnown
     ? bridge.mute
@@ -87,8 +81,7 @@ Item {
 
   // ------------------------------------------------------------ actions
 
-  // Re-reads both tiers: the process poll, and Discord's own state in case a
-  // dispatch was missed. The bridge ignores this while it is down.
+  // Re-reads both tiers in case a dispatch was missed; the bridge ignores this while down.
   function refresh() {
     if (!statusProcess.running) statusProcess.running = true
     bridge.refresh()
@@ -102,8 +95,7 @@ Item {
     mainPid = parsed.mainPid
   }
 
-  // Same path the Omarchy launcher uses, so Discord lands in app-graphical.slice
-  // instead of inheriting the compositor's service.
+  // The launcher's own path, so Discord lands in app-graphical.slice, not the compositor's.
   function launch() {
     if (!installed) return
     Util.execDetached("uwsm-app -- gtk-launch discord.desktop")
@@ -117,8 +109,7 @@ Item {
     Hyprland.dispatch("focuswindow address:" + target.address)
   }
 
-  // Re-running the desktop entry is what recovers an instance that closed to a
-  // tray icon: Electron hands the launch to the running process, which unhides.
+  // Electron hands a re-launch to the running process, which unhides a tray-hidden instance.
   function open() {
     if (hasWindow) focusWindow(primaryWindow)
     else launch()
@@ -131,8 +122,7 @@ Item {
     settle()
   }
 
-  // Discord's own mute when the bridge is up: it survives the mic closing and
-  // shows in Discord's UI, neither of which muting a PipeWire stream does.
+  // Discord's own mute survives the mic closing and shows in its UI; PipeWire's does neither.
   function toggleMic() {
     if (voiceKnown) {
       bridge.setMute(!bridge.mute)
@@ -161,8 +151,7 @@ Item {
     if (playbackNode && playbackNode.audio) playbackNode.audio.volume = Math.max(0, Math.min(maxVolume, value))
   }
 
-  // Electron takes seconds to start or exit, so re-poll a few times rather than
-  // leaving the panel stale until the next interval.
+  // Electron takes seconds to start or exit, so re-poll rather than wait out the interval.
   function settle() {
     settleTimer.ticks = 0
     settleTimer.restart()
@@ -183,8 +172,7 @@ Item {
       waitForEnd: true
     }
 
-    // ps exits 1 with no output when nothing matches, which is Discord not
-    // running rather than a failure.
+    // ps exits 1 with no output when nothing matches, which is Discord down, not a failure.
     onExited: function (exitCode) {
       if (exitCode === 0 || exitCode === 1) {
         root.applyProcesses(statusStdout.text)

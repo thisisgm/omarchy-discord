@@ -42,8 +42,7 @@ Item {
     voiceState = ""
   }
 
-  // Setup happens in a terminal while the shell keeps running, so opening the
-  // panel is the moment to notice it and try again.
+  // Setup happens while the shell runs, so opening the panel re-checks.
   function retry() {
     configured = true
     holdOff = false
@@ -65,8 +64,7 @@ Item {
     if (!state) return
 
     if (state.ok === false) {
-      // The bridge says outright when it can never work, so we stop rather than
-      // reporting a setup step as a failure.
+      // The bridge says outright when it can never work, so stop rather than retry.
       if (state.configured === false) root.configured = false
       root.error = String(state.error || "Discord RPC failed")
       root.ready = false
@@ -98,8 +96,7 @@ Item {
       onRead: function (line) { root.applyLine(line) }
     }
 
-    // The bridge reports its own failures as JSON, so anything on stderr is a
-    // crash worth showing verbatim.
+    // The bridge reports its own failures as JSON, so stderr is a crash.
     stderr: SplitParser {
       onRead: function (line) {
         var text = String(line).trim()

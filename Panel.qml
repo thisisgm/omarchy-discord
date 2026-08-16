@@ -61,8 +61,7 @@ Panel {
   property bool cursorActive: false
   property int rowIndex: 0
 
-  // Every cursor stop in draw order. Rows look themselves up by kind, so a
-  // section appearing or disappearing cannot desync keyboard from layout.
+  // Cursor stops in draw order; rows look themselves up by kind, so nothing desyncs.
   readonly property var navRows: {
     var list = []
     if (discord.installed) list.push({ kind: "power" })
@@ -73,8 +72,7 @@ Panel {
     if (discord.hasPlayback) list.push({ kind: "volume" })
     if (setupVisible && !setupOpen) list.push({ kind: "setup" })
     for (var i = 0; i < discord.windows.length; i++) list.push({ kind: "window", windowIndex: i })
-    // The window rows already focus Discord, so this row is only the way in
-    // when there is no window to click.
+    // The window rows already focus Discord, so this row is only for when there is none.
     if (!discord.hasWindow) list.push({ kind: "open" })
     return list
   }
@@ -142,8 +140,7 @@ Panel {
     id: discord
   }
 
-  // Shows whether audio is actually reaching the call, not just that the mic
-  // is unmuted.
+  // Shows audio actually reaching the call, not just that the mic is unmuted.
   PwNodePeakMonitor {
     id: micPeak
     node: discord.captureNode
@@ -160,8 +157,7 @@ Panel {
     function hide(): void { root.close() }
     function toggle(): void { root.toggle() }
     function raise(): string { discord.open(); return "ok" }
-    // Discord answers the bridge asynchronously, so report the request, not a
-    // state that has not landed yet.
+    // Discord answers the bridge asynchronously, so report the request, not the state.
     function mute(): string { discord.toggleMic(); return "ok" }
     function deafen(): string { discord.toggleDeaf(); return "ok" }
     function hangup(): string { discord.hangUp(); return "ok" }
@@ -211,8 +207,7 @@ Panel {
           opacity: discord.running ? 1.0 : 0.75
         }
 
-        // The icon alone cannot say you are connected; the dot turns urgent
-        // while the call cannot hear you. The ring keeps it off Clyde's leg.
+        // Says connected, urgent when the call cannot hear you; the ring clears Clyde's leg.
         Rectangle {
           visible: discord.inVoice
           width: Style.space(6)
@@ -295,8 +290,7 @@ Panel {
             width: parent.width
             implicitHeight: hero.implicitHeight
 
-            // The hero's trailingControl resolves `root` to PanelHero, so panel
-            // state has to be reached through this wrapper.
+            // trailingControl resolves `root` to PanelHero, so panel state comes through here.
             readonly property int navIndex: root.indexOfRow("power", -1)
             readonly property bool switchHasCursor: root.cursorActive && root.rowIndex === navIndex
             function focusSwitch() { root.setCursor(header.navIndex) }
@@ -317,8 +311,7 @@ Panel {
               }
             }
 
-            // On means running: Discord is expensive enough to keep around
-            // that turning it off is a real thing to want from a bar.
+            // On means running; Discord is expensive enough that turning it off belongs here.
             trailingControl: Component {
               ToggleSwitch {
                 id: powerSwitch
@@ -341,8 +334,7 @@ Panel {
           }
 
           Text {
-            // A bridge nobody set up is not an error, so it stays quiet until
-            // credentials exist. See README.
+            // A bridge nobody set up is not an error, so it stays quiet until credentials exist.
             readonly property string message: discord.lastError !== ""
               ? discord.lastError
               : (discord.rpc.configured ? discord.rpc.error : "")
@@ -565,8 +557,7 @@ Panel {
 
   // ------------------------------------------------------------ components
 
-  // The Dropbox panel's label/value pair, laid out with the row layout this
-  // file already imports instead of a hand-measured spacer.
+  // Dropbox's label/value pair, on a RowLayout instead of a hand-measured spacer.
   component InfoPair: RowLayout {
     id: infoPair
     property string label: ""
@@ -594,8 +585,7 @@ Panel {
     }
   }
 
-  // Discord's own voice panel names the call on the left and puts mute, deafen
-  // and hang up as icons on the right. This is that row, in Omarchy's parts.
+  // Discord's own layout: call named on the left, mute/deafen/hang-up as icons on the right.
   component CallRow: Item {
     implicitHeight: callContent.implicitHeight + Style.spacing.rowPaddingX
 
