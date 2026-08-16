@@ -59,3 +59,15 @@ Hard-won findings. Re-verify before changing the code that depends on them.
   `rpc.py` for a stub that prints the same one-JSON-object-per-line state and
   echoes commands back. That exercises `Rpc.qml`, every new row, the nav order,
   and the glyphs. Restore the real file afterwards and `cmp` it against the repo.
+- **The RPC socket belongs to the Electron binary, not to Discord-the-website.**
+  `ss -xlp` shows `/run/user/1000/discord-ipc-0` held by `("Discord",pid=…)`.
+  Omarchy webapps are `chromium --app=URL` (see `omarchy-launch-webapp`), which
+  never creates that socket — so running Discord as a webapp would delete the
+  whole optional tier, and would also break the window class (`discord`), the
+  PipeWire match (`application.process.binary == "Discord"`) and the `ps -C
+  Discord` footprint, none of which a shared Chromium process can provide.
+- **Omarchy spends `urgent` on errors and attention, never on labelling a
+  button.** The Dropbox panel colours with it only when `lastError` is set, and
+  the power panel draws shutdown and reboot in plain `foreground`. Action rows
+  here follow that: state can be urgent (muted, deafened, wants attention), a
+  button caption cannot.

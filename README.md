@@ -116,19 +116,24 @@ for the author and for nobody else. There is no anonymous route.
 
 So the bridge is opt-in, and **the plugin is complete without it**: with no
 credentials `rpc.py` exits immediately and the panel is exactly what you see
-above. To turn it on:
+above. To turn it on, with Discord running:
 
-1. Create an app at <https://discord.com/developers/applications>.
-2. OAuth2 → add the redirect URI `http://localhost/omarchy-discord`.
-3. Add yourself under **App Testers**.
-4. Export `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET` where the shell can
-   see them, or put them in the 1Password Environment `rpc.py` reads.
+```bash
+python3 ~/.config/omarchy/plugins/io.github.thisisgm.discord/rpc.py --setup
+```
 
-Check it with `python3 rpc.py --probe`. The first real run raises a consent
-dialog inside Discord once and caches a token in
-`~/.local/state/omarchy-discord/token.json` (0600). The panel then gains the
-call's name, deafen, mic gain, and a leave-call row, and the mic row starts
-driving Discord's own mute.
+That opens the developer portal, prints the two things to create there, takes
+the Application ID and Client Secret, and then authorizes against your running
+Discord so you find out it worked before you leave the terminal. It stores the
+pair in `~/.config/omarchy-discord/credentials.json` and the token in
+`~/.local/state/omarchy-discord/token.json`, both `0600`.
+
+Open the panel afterwards — no restart needed — and it gains the call's name,
+deafen, mic gain, and a leave-call row, and the mic row starts driving
+Discord's own mute. `--probe` re-checks it any time.
+
+If you are not the application's owner, your account has to be on its **App
+Testers** list; the owner is already covered.
 
 ## Uninstall
 

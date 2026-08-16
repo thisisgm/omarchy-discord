@@ -107,6 +107,7 @@ Panel {
     rowIndex = 0
     if (panelFlick) panelFlick.contentY = 0
     discord.refresh()
+    discord.rpc.retry()
     Qt.callLater(function () { keyCatcher.forceActiveFocus() })
   }
 
@@ -427,7 +428,7 @@ Panel {
               visible: discord.running
               width: parent.width
               kind: "quit"
-              glyph: "󰅙"
+              glyph: "󰐥"
               label: "Quit Discord"
               sub: Model.formatMemory(discord.memoryMib) + " back"
               onTriggered: discord.quit()
@@ -813,7 +814,7 @@ Panel {
 
       Text {
         text: actionRow.glyph
-        color: actionRow.kind === "quit" || actionRow.kind === "hangup" ? root.urgent : root.foreground
+        color: root.foreground
         font.family: root.fontFamily
         font.pixelSize: Style.font.icon
         Layout.alignment: Qt.AlignVCenter

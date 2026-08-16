@@ -78,10 +78,13 @@ Phase 1 and shows no error, because a tier nobody set up is not a failure.
 
 ### Next steps, in order
 
-1. Add the credentials, then `python3 rpc.py --probe` — it should name the
-   logged-in user.
-2. Authorize once (a consent dialog appears inside Discord) and confirm the
-   token lands in `~/.local/state/omarchy-discord/token.json` at 0600.
+1. Run `python3 rpc.py --setup` with Discord running. It opens the portal,
+   takes the two values, writes them 0600, and authorizes in the same run.
+   Both failure paths are already tested: a non-numeric Application ID is
+   rejected before anything is written, and an unregistered one comes back
+   `Invalid Client ID` with the redirect-URI and App-Testers hints.
+2. Confirm the token lands in `~/.local/state/omarchy-discord/token.json` at
+   0600. Opening the panel re-tries the bridge, so no shell restart is needed.
 3. Re-check the panel against a real call: channel and guild names, deafen,
    mic gain, leave call, and that the mic row now moves Discord's own mute.
 4. Confirm the bar dot follows Discord's mute rather than the capture stream.
@@ -108,6 +111,11 @@ Phase 1 and shows no error, because a tier nobody set up is not a failure.
 - **Restart Discord** — cut. Quit plus start is two clicks, and the relaunch
   race (Electron handing a launch to a still-dying instance) could not be
   verified.
+- **Running Discord as an Omarchy webapp** — rejected 2026-08-16. It would
+  remove the RPC socket (owned by the Electron binary, proven with `ss -xlp`)
+  and break the window class, the PipeWire match and the footprint poll, all of
+  which depend on a process actually called `Discord`. It only solves the
+  duplicate tray icon, which is already solved. See `NOTES.md`.
 - **Discord's own output volume slider** — cut, though `rpc.py` implements the
   command. The panel already has a "Discord volume" slider (PipeWire, desktop
   level) that answers the same question the same way and keeps working outside

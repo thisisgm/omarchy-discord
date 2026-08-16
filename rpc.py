@@ -6,16 +6,18 @@ parse; this process owns that connection and exposes one JSON object per line.
 It prints a full state snapshot whenever anything changes, and reads one
 command object per line from stdin.
 
+Set it up with:         python3 rpc.py --setup
 Check it by hand with:  python3 rpc.py --probe
 """
 
-import json, os, signal, socket, struct, sys, threading, time
+import json, os, signal, socket, struct, subprocess, sys, threading, time
 import urllib.parse, urllib.request
 
 OP_HANDSHAKE, OP_FRAME, OP_CLOSE, OP_PING, OP_PONG = 0, 1, 2, 3, 4
 
 HEADER = struct.Struct("<II")
 API = "https://discord.com/api"
+PORTAL = "https://discord.com/developers/applications"
 SCOPES = ["rpc", "rpc.voice.read", "rpc.voice.write"]
 REDIRECT_URI = "http://localhost/omarchy-discord"
 
@@ -31,6 +33,10 @@ STATE_DIR = os.path.join(
     os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")),
     "omarchy-discord")
 TOKEN_PATH = os.path.join(STATE_DIR, "token.json")
+CONFIG_DIR = os.path.join(
+    os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
+    "omarchy-discord")
+CREDENTIALS_PATH = os.path.join(CONFIG_DIR, "credentials.json")
 SECRETS_PATH = os.environ.get("OMARCHY_DISCORD_SECRETS",
                               os.path.expanduser("~/.claude/secrets/.env"))
 
@@ -68,16 +74,41 @@ def read_secrets_file(path):
     return values
 
 
+def write_private(path, payload):
+    """Write JSON readable only by its owner, and never briefly wider."""
+    directory = os.path.dirname(path)
+    os.makedirs(directory, mode=TOKEN_DIR_MODE, exist_ok=True)
+    temporary = path + ".tmp"
+    with open(temporary, "w") as handle:
+        json.dump(payload, handle)
+    os.chmod(temporary, TOKEN_MODE)
+    os.replace(temporary, path)
+
+
+def read_credentials_file():
+    try:
+        with open(CREDENTIALS_PATH) as handle:
+            stored = json.load(handle)
+    except (OSError, ValueError):
+        return {}
+    return stored if isinstance(stored, dict) else {}
+
+
 def credentials():
+    """Environment first, then the file --setup writes, then a secrets mount."""
     client_id = os.environ.get("DISCORD_CLIENT_ID", "")
     client_secret = os.environ.get("DISCORD_CLIENT_SECRET", "")
+    if not client_id or not client_secret:
+        stored = read_credentials_file()
+        client_id = client_id or str(stored.get("client_id", ""))
+        client_secret = client_secret or str(stored.get("client_secret", ""))
     if not client_id or not client_secret:
         secrets = read_secrets_file(SECRETS_PATH)
         client_id = client_id or secrets.get("DISCORD_CLIENT_ID", "")
         client_secret = client_secret or secrets.get("DISCORD_CLIENT_SECRET", "")
     if not client_id or not client_secret:
-        raise RpcError("No Discord application credentials: set DISCORD_CLIENT_ID "
-                       "and DISCORD_CLIENT_SECRET in the 1Password claude-skills Environment")
+        raise RpcError("Discord voice controls are not set up yet — run: "
+                       "python3 %s --setup" % os.path.abspath(__file__))
     return client_id.strip(), client_secret.strip()
 
 
@@ -403,7 +434,76 @@ def probe():
 EXIT_UNCONFIGURED = 2
 
 
+def ask(label):
+    sys.stdout.write(label)
+    sys.stdout.flush()
+    return sys.stdin.readline().strip()
+
+
+def open_portal():
+    if not (os.environ.get("WAYLAND_DISPLAY") or os.environ.get("DISPLAY")):
+        return
+    try:
+        subprocess.Popen(["xdg-open", PORTAL],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print("Opened the developer portal in your browser.\n")
+    except OSError:
+        pass
+
+
+def setup():
+    """Register the application, save the pair, and prove the tier end to end."""
+    print("Discord refuses anonymous clients, so the voice controls need an")
+    print("application of your own. This is the only setup, and it is one time.\n")
+    print("1. Create an application, any name, at:")
+    print("     %s" % PORTAL)
+    print("2. Open OAuth2 and add this redirect URI, exactly:")
+    print("     %s" % REDIRECT_URI)
+    print("3. Copy the Application ID, and the Client Secret from the same page")
+    print("   (use Reset Secret if it is hidden).\n")
+    open_portal()
+
+    client_id = ask("Application ID: ")
+    if not client_id.isdigit():
+        print("\nThat is not an Application ID — it is a long number.")
+        return 1
+    client_secret = ask("Client Secret:  ")
+    if not client_secret:
+        print("\nNo client secret given.")
+        return 1
+
+    write_private(CREDENTIALS_PATH, {"client_id": client_id,
+                                     "client_secret": client_secret})
+    print("\nSaved to %s, readable only by you." % CREDENTIALS_PATH)
+
+    try:
+        rpc = Rpc(connect_socket())
+    except RpcError as error:
+        print("%s — start Discord and run this again." % error)
+        return 1
+
+    print("Discord will now ask you to authorize it. Approve that prompt.\n")
+    try:
+        ready = handshake(rpc, client_id)
+        token = valid_token(client_id, client_secret) or authorize(rpc, client_id, client_secret)
+        rpc.request("AUTHENTICATE", {"access_token": token["access_token"]})
+        print("Ready — authenticated as %s."
+              % (ready.get("user") or {}).get("username", "your account"))
+        print("Open the Discord panel in the bar and the call controls are there.")
+        return 0
+    except RpcError as error:
+        print("Discord refused: %s\n" % error)
+        print("Check the redirect URI is exactly %s." % REDIRECT_URI)
+        print("If the application is not yours, your account must be on its")
+        print("App Testers list; the owner is already covered.")
+        return 1
+    finally:
+        rpc.close()
+
+
 def main():
+    if "--setup" in sys.argv:
+        return setup()
     if "--probe" in sys.argv:
         return probe()
     # Credentials cannot appear while we run, so retrying would only spin.

@@ -40,6 +40,13 @@ Item {
     speaking = []
   }
 
+  // Setup happens in a terminal while the shell keeps running, so opening the
+  // panel is the moment to notice it and try again.
+  function retry() {
+    configured = true
+    holdOff = false
+  }
+
   function send(message) {
     if (!bridge.running) return
     bridge.write(JSON.stringify(message) + "\n")
