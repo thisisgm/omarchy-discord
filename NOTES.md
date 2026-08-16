@@ -27,3 +27,19 @@ Hard-won findings. Re-verify before changing the code that depends on them.
   client_secret at `https://discord.com/api/oauth2/token`.
 - **First-party sizing**: Tailscale's bar icon uses `Style.space(11)` and
   `Style.font.display` in the hero. This plugin matches.
+- **Bar icons share a height, not a weight.** Every widget mark on this bar is
+  13px tall, so height matching proves nothing. Measured lit-pixel mass at
+  `Style.font.icon`: Clyde fitted to full height 119.4, Agents 78.5, Volume 77.5,
+  Wifi 55.7, Monitor 48.9, Bluetooth 31.9, Tailscale 31.7 — Clyde carried 2.2x
+  the average because it is the only solid landscape mark in the set. Dropbox
+  makes the same correction with `scale: 0.95` on its Shape. `opticalScale: 0.85`
+  brings Clyde to 86.9, alongside Agents and Volume. Re-measure with `grim` plus
+  a background-delta sum if the icon path or `Style.font.icon` changes.
+- **Discord's own tray item is `discord_status_icon_1`** (lowercase; Slack's is
+  `Slack_status_icon_1`, so Electron follows the app's internal name). Omarchy
+  suppresses first-party duplicates in `TrayModel.ownedByOmarchy`, but that list
+  is hardcoded under `/usr/share` and takes no plugin hook, so this plugin uses
+  the shell's own per-item `hidden` list in `shell.json` instead. The tray's
+  manage popup writes the same field, so a mismatched id is one right-click to
+  fix. Not observable live: Discord registered no SNI item at all during this
+  session, window open and 9 processes up, so only the config is proven.

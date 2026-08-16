@@ -1,6 +1,6 @@
 # Progress
 
-Last updated 2026-08-15.
+Last updated 2026-08-16.
 
 ## Phase 1 — bar widget: DONE, verified live
 
@@ -19,6 +19,27 @@ shell already runs; nothing polls Discord's servers and no account is involved.
 
 Panel confirmed rendering: hero "IN A CALL · MIC CLOSED", footprint row, volume
 slider, window row `#general | GM's Server` on workspace 4, quit row.
+
+## Phase 1.1 — bar integration polish: DONE, verified live
+
+Two fixes so the widget sits in the bar as a native, not a guest.
+
+**Icon weight.** Every mark on this bar is 13px tall, so matching height had
+proven nothing: Clyde is the only solid landscape mark in the set and carried
+119.4 lit pixels against 78.5 for Agents and 31.7 for Tailscale — 2.2x the
+average. `DiscordIcon.opticalScale: 0.85` brings it to 86.9, level with the
+heaviest first-party icons. Dropbox makes the same correction (`scale: 0.95`).
+Measurements and method in `NOTES.md`; the panel hero was re-checked after.
+
+**Stock tray icon.** Discord registers `discord_status_icon_1` of its own, so
+the bar showed two Discord icons. Moved that id from the tray's `pinned` to its
+`hidden` list in `~/.config/omarchy/shell.json` (backup:
+`shell.json.bak.discord-dedup`). Omarchy's own fix for this — the Dropbox rule
+in `TrayModel.ownedByOmarchy` — is hardcoded under `/usr/share` with no plugin
+hook, and forking a 29KB first-party widget to add one line would cost the
+user every upstream tray fix. The `hidden` list is the shell's own affordance
+for exactly this and is one right-click to undo. README documents the manual
+route so the plugin is correct for anyone else installing it.
 
 ## Phase 2 — Discord RPC: written, inert, BLOCKED
 
@@ -63,6 +84,11 @@ run triggers a consent modal inside Discord and caches a token to
 - Attention (`urgent`) has not been seen fire yet; it needs an incoming mention
   while Discord is unfocused.
 - The plugin has never run on a machine without Discord installed.
+- **Discord's tray item never registered during the 2026-08-16 session**, with a
+  window open and 9 processes up, so the `hidden` entry is proven only as
+  config. If a stock Discord icon ever reappears beside this widget, check the
+  id it registers under against `discord_status_icon_1` and hide it from the
+  tray's Manage popup, which writes the field correctly whatever the id.
 
 ## Ideas deliberately not built
 

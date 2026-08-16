@@ -17,8 +17,11 @@ Item {
   readonly property real boxTop: 2.85
   readonly property real boxHeight: 18.3
 
-  implicitWidth: iconSize * (boxWidth / boxHeight)
-  implicitHeight: iconSize
+  // Clyde is solid where its bar neighbours are sparse; 0.85 matches their ink (NOTES.md).
+  readonly property real opticalScale: 0.85
+
+  implicitWidth: iconSize * opticalScale * (boxWidth / boxHeight)
+  implicitHeight: iconSize * opticalScale
   width: implicitWidth
   height: implicitHeight
 

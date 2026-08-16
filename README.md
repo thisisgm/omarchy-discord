@@ -34,6 +34,19 @@ omarchy-shell shell rescanPlugins
 omarchy plugin enable io.github.thisisgm.discord
 ```
 
+## Replace Discord's own tray icon
+
+Discord registers a tray item of its own, so out of the box you get two Discord
+icons in the bar. Omarchy already solves this for its bundled plugins — the tray
+hides Dropbox's item when the Dropbox widget is loaded — but that list lives in
+the shell and takes no plugin hook, so hide Discord's item once by hand:
+
+right-click the tray > **Manage** > untick Discord.
+
+That writes `discord_status_icon_1` into the tray's `hidden` list in
+`~/.config/omarchy/shell.json`, and it stays hidden across restarts. Untick it
+again if you ever remove this widget.
+
 ## Using it
 
 The bar icon dims when Discord is not running, turns the theme's urgent
