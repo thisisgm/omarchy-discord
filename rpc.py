@@ -34,6 +34,9 @@ SOCKET_POLL_SEC = 0.2
 # Discord pings several times a second; a bar only cares about the coarse value.
 PING_ROUND_MS = 10
 SECRETS_READ_TIMEOUT_SEC = 5
+# Warnings quote their input, clipped so one bad line cannot flood the log.
+WARN_INPUT_CHARS = 80
+HTTP_DETAIL_CHARS = 200
 PUBLIC_KEY_LENGTH = 64
 HEX_DIGITS = "0123456789abcdefABCDEF"
 
@@ -58,6 +61,12 @@ class RpcError(Exception):
 
 class RpcRejected(RpcError):
     """Discord refused one command; the connection itself is still good."""
+
+
+def clip(text, limit):
+    """Shorten for a log line, marking the cut so nobody reads it as the whole input."""
+    text = str(text).strip()
+    return text if len(text) <= limit else text[:limit] + "..."
 
 
 def warn(message):
@@ -175,7 +184,7 @@ def post_token(client_id, client_secret, fields):
         # The body names the actual problem; the status alone never does.
         detail = ""
         try:
-            detail = error.read().decode("utf-8", "replace").strip()[:200]
+            detail = clip(error.read().decode("utf-8", "replace"), HTTP_DETAIL_CHARS)
         except OSError:
             pass
         raise RpcError("Discord token request failed: HTTP %d %s"
@@ -410,7 +419,7 @@ class Bridge:
         try:
             message = json.loads(line)
         except ValueError:
-            warn("ignored a command that is not JSON: %r" % line.strip()[:80])
+            warn("ignored a command that is not JSON: %r" % clip(line, WARN_INPUT_CHARS))
             return
         name, value = message.get("cmd"), message.get("value")
         if name in ("mute", "deaf"):
@@ -438,7 +447,7 @@ class Bridge:
             try:
                 self.handle_command(line)
             except RpcRejected as error:
-                warn("Discord refused %s: %s" % (line.strip()[:80], error))
+                warn("Discord refused %s: %s" % (clip(line, WARN_INPUT_CHARS), error))
 
     def drain_deferred(self):
         changed = False
