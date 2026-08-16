@@ -1,2 +1,10 @@
 __pycache__/
 *.pyc
+
+# scratch screenshots from grim
+callrow*.png
+setup*.png
+align*.png
+v[0-9]*.png
+final*.png
+oem*.png
