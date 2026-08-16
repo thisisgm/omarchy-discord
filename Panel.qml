@@ -42,6 +42,19 @@ Panel {
     if (!saveProcess.running) saveProcess.running = true
   }
 
+  // The form's fields are not cursor stops, so opening it has to hand focus over.
+  function openSetup() {
+    setupOpen = true
+    setupId.forceActiveFocus()
+  }
+
+  function resetSetup() {
+    setupOpen = false
+    setupError = ""
+    setupId.text = ""
+    setupSecret.text = ""
+  }
+
   readonly property string callSubtitle: {
     if (discord.rpc.deaf) return "Deafened"
     if (discord.micMuted) return "Muted"
@@ -118,8 +131,8 @@ Panel {
     case "hangup": discord.hangUp(); break
     case "volume": discord.toggleAppMute(); break
     case "window": discord.focusWindow(discord.windows[currentRow.windowIndex]); root.close(); break
-    case "open": discord.open(); root.close(); break
-    case "setup": root.setupOpen = true; break
+    case "open": if (discord.installed) { discord.open(); root.close() } break
+    case "setup": root.openSetup(); break
     }
   }
 
@@ -134,6 +147,8 @@ Panel {
     discord.refresh()
     discord.rpc.retry()
     Qt.callLater(function () { keyCatcher.forceActiveFocus() })
+  } else {
+    resetSetup()
   }
 
   Service {
@@ -144,7 +159,7 @@ Panel {
   PwNodePeakMonitor {
     id: micPeak
     node: discord.captureNode
-    enabled: root.opened && discord.inVoice
+    enabled: root.opened && discord.captureNode !== null
   }
 
   // raise and mute are the two worth binding a key to.
@@ -182,10 +197,7 @@ Panel {
 
     onExited: function (exitCode) {
       if (exitCode !== 0) return
-      root.setupOpen = false
-      root.setupError = ""
-      setupId.text = ""
-      setupSecret.text = ""
+      root.resetSetup()
       discord.rpc.retry()
     }
   }
@@ -263,6 +275,7 @@ Panel {
       onCloseRequested: root.close()
       onTabRequested: function (direction) { root.switchPanel(direction) }
       onTextKey: function (t) {
+        if (root.setupOpen) return
         if (t === "o" || t === "O") { discord.open(); root.close() }
         else if (t === "m" || t === "M") discord.toggleMic()
         else if (t === "d" || t === "D") discord.toggleDeaf()
@@ -426,7 +439,7 @@ Panel {
                 glyph: "󰒓"
                 label: "Set up voice controls"
                 sub: "Channel name, deafen and hang up"
-                onTriggered: root.setupOpen = true
+                onTriggered: root.openSetup()
               }
 
               Column {

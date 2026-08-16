@@ -45,6 +45,7 @@ Item {
   // Setup happens while the shell runs, so opening the panel re-checks.
   function retry() {
     configured = true
+    error = ""
     holdOff = false
   }
 
