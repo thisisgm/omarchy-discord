@@ -14,6 +14,7 @@ panel, and no configuration.
 | Does it want you? | Hyprland | the window's urgency flag, which Discord raises on a mention or a DM |
 | Where is the window? | Hyprland | `toplevels`, with title and workspace |
 | Are you in a call? | PipeWire | Discord's WebRTC voice streams exist only while connected |
+| How good is the call? | Discord RPC | `VOICE_CONNECTION_STATUS` ping, drawn as signal strength (optional tier) |
 | Can the call hear you? | PipeWire | the capture stream, and whether it is muted |
 | What does it cost? | `ps` | resident memory and process count |
 
@@ -116,7 +117,8 @@ for the author and for nobody else. There is no anonymous route.
 
 So the bridge is opt-in, and **the plugin is complete without it**: with no
 credentials `rpc.py` exits immediately and the panel is exactly what you see
-above. To turn it on, with Discord running:
+above. To turn it on, open the panel and use **Set up voice controls** — it takes the
+two values inline, no terminal. The same thing from a shell, if you prefer:
 
 ```bash
 python3 ~/.config/omarchy/plugins/io.github.thisisgm.discord/rpc.py --setup

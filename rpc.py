@@ -29,6 +29,8 @@ TOKEN_MODE = 0o600
 TOKEN_DIR_MODE = 0o700
 REFRESH_MARGIN_SEC = 300
 RECONNECT_DELAY_SEC = 5
+# Discord pings several times a second; a bar only cares about the coarse value.
+PING_ROUND_MS = 10
 SECRETS_READ_TIMEOUT_SEC = 5
 PUBLIC_KEY_LENGTH = 64
 HEX_DIGITS = "0123456789abcdefABCDEF"
@@ -285,7 +287,8 @@ class Bridge:
         self.guilds = {}
         self.state = {"ok": True, "channel": "", "guild": "", "mute": False,
                       "deaf": False, "inputVolume": 100, "outputVolume": 100,
-                      "mode": "", "speaking": [], "error": ""}
+                      "mode": "", "speaking": [], "error": "",
+                      "ping": 0, "voiceState": ""}
 
     def emit(self):
         self.state["speaking"] = sorted(
@@ -340,7 +343,20 @@ class Bridge:
                 self.rpc.subscribe(event, {"channel_id": channel_id})
         self.subscribed_channel = channel_id
 
+    # {"state": "VOICE_CONNECTED", "average_ping": 36, "last_ping": 35, ...}
+    def apply_connection(self, data):
+        state = str(data.get("state") or "")
+        ping = int(data.get("average_ping") or 0)
+        rounded = int(round(ping / float(PING_ROUND_MS)) * PING_ROUND_MS)
+        if state == self.state["voiceState"] and rounded == self.state["ping"]:
+            return False
+        self.state["voiceState"] = state
+        self.state["ping"] = rounded
+        return True
+
     def handle_event(self, event, data):
+        if event == "VOICE_CONNECTION_STATUS":
+            return self.apply_connection(data)
         if event == "VOICE_SETTINGS_UPDATE":
             self.apply_voice_settings(data)
         elif event == "VOICE_CHANNEL_SELECT":
@@ -380,7 +396,8 @@ class Bridge:
         self.emit()
 
     def run(self):
-        for event in ("VOICE_SETTINGS_UPDATE", "VOICE_CHANNEL_SELECT"):
+        for event in ("VOICE_SETTINGS_UPDATE", "VOICE_CHANNEL_SELECT",
+                      "VOICE_CONNECTION_STATUS"):
             self.rpc.subscribe(event)
         self.refresh()
         threading.Thread(target=self.read_commands, daemon=True).start()
@@ -450,6 +467,34 @@ def probe():
         rpc.close()
 
 
+def looks_like_public_key(value):
+    return len(value) == PUBLIC_KEY_LENGTH and all(c in HEX_DIGITS for c in value)
+
+
+# stdin carries {"client_id": "...", "client_secret": "..."} on one line
+def save_from_stdin():
+    """Take the pair on stdin so no secret ever appears in argv or in ps."""
+    try:
+        message = json.loads(sys.stdin.readline())
+    except ValueError:
+        sys.stderr.write("Expected one JSON object on stdin\n")
+        return 1
+    client_id = str(message.get("client_id", "")).strip()
+    client_secret = str(message.get("client_secret", "")).strip()
+    if not client_id.isdigit():
+        sys.stderr.write("The Client ID is a long number, digits only\n")
+        return 1
+    if not client_secret:
+        sys.stderr.write("The Client Secret is empty\n")
+        return 1
+    if looks_like_public_key(client_secret):
+        sys.stderr.write("That is the Public Key; the secret is on the OAuth2 page\n")
+        return 1
+    write_private(CREDENTIALS_PATH, {"client_id": client_id,
+                                     "client_secret": client_secret})
+    return 0
+
+
 EXIT_UNCONFIGURED = 2
 
 
@@ -500,7 +545,7 @@ def collect_credentials():
         print("\nNo client secret given.")
         return None
     # The Public Key is an Ed25519 key: 32 bytes, so exactly 64 hex characters.
-    if len(client_secret) == PUBLIC_KEY_LENGTH and all(c in HEX_DIGITS for c in client_secret):
+    if looks_like_public_key(client_secret):
         print("\nThat is the Public Key, not the Client Secret — it signs")
         print("interaction webhooks and cannot buy a token. The secret is on")
         print("the OAuth2 page, behind Reset Secret.")
@@ -554,6 +599,8 @@ def setup():
 
 
 def main():
+    if "--save" in sys.argv:
+        return save_from_stdin()
     if "--setup" in sys.argv:
         return setup()
     if "--probe" in sys.argv:

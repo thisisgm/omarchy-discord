@@ -27,9 +27,25 @@ Panel {
   // Discord's own call controls exist only while the bridge is in a call.
   readonly property bool callControls: discord.rpc.inVoice
 
+  readonly property string pingQuality: Model.pingQuality(
+    discord.rpc.ping, discord.rpc.voiceState === "VOICE_CONNECTED")
+
+  // Must match REDIRECT_URI in rpc.py.
+  readonly property string redirectUri: "http://localhost/omarchy-discord"
+
+  readonly property bool setupVisible: discord.running && !discord.rpc.configured
+  property bool setupOpen: false
+  property string setupError: ""
+
+  function submitSetup() {
+    setupError = ""
+    if (!saveProcess.running) saveProcess.running = true
+  }
+
   readonly property string callSubtitle: {
     if (discord.rpc.deaf) return "Deafened"
     if (discord.micMuted) return "Muted"
+    if (pingQuality === "poor" || pingQuality === "fair") return "Unstable · " + discord.rpc.ping + " ms"
     var talking = discord.rpc.speaking
     if (talking.length === 1) return talking[0] + " is talking"
     if (talking.length > 1) return talking.join(", ") + " are talking"
@@ -49,16 +65,17 @@ Panel {
   // section appearing or disappearing cannot desync keyboard from layout.
   readonly property var navRows: {
     var list = []
+    if (discord.installed) list.push({ kind: "power" })
     if (discord.hasMicControl) list.push({ kind: "mic" })
     if (callControls) list.push({ kind: "deafen" })
     if (callControls) list.push({ kind: "hangup" })
     if (callControls) list.push({ kind: "gain" })
     if (discord.hasPlayback) list.push({ kind: "volume" })
+    if (setupVisible && !setupOpen) list.push({ kind: "setup" })
     for (var i = 0; i < discord.windows.length; i++) list.push({ kind: "window", windowIndex: i })
     // The window rows already focus Discord, so this row is only the way in
     // when there is no window to click.
     if (!discord.hasWindow) list.push({ kind: "open" })
-    if (discord.running) list.push({ kind: "quit" })
     return list
   }
 
@@ -97,13 +114,14 @@ Panel {
   function activateCursor() {
     if (!currentRow) return
     switch (currentRow.kind) {
+    case "power": discord.running ? discord.quit() : discord.launch(); break
     case "mic": discord.toggleMic(); break
     case "deafen": discord.toggleDeaf(); break
     case "hangup": discord.hangUp(); break
     case "volume": discord.toggleAppMute(); break
     case "window": discord.focusWindow(discord.windows[currentRow.windowIndex]); root.close(); break
     case "open": discord.open(); root.close(); break
-    case "quit": discord.quit(); break
+    case "setup": root.setupOpen = true; break
     }
   }
 
@@ -147,6 +165,33 @@ Panel {
     function mute(): string { discord.toggleMic(); return "ok" }
     function deafen(): string { discord.toggleDeaf(); return "ok" }
     function hangup(): string { discord.hangUp(); return "ok" }
+  }
+
+  Process {
+    id: saveProcess
+    command: ["python3", discord.rpc.scriptPath, "--save"]
+    stdinEnabled: true
+
+    onStarted: write(JSON.stringify({
+      client_id: String(setupId.text).trim(),
+      client_secret: String(setupSecret.text).trim()
+    }) + "\n")
+
+    stderr: SplitParser {
+      onRead: function (line) {
+        var text = String(line).trim()
+        if (text !== "") root.setupError = text
+      }
+    }
+
+    onExited: function (exitCode) {
+      if (exitCode !== 0) return
+      root.setupOpen = false
+      root.setupError = ""
+      setupId.text = ""
+      setupSecret.text = ""
+      discord.rpc.retry()
+    }
   }
 
   BarIconButton {
@@ -245,6 +290,17 @@ Panel {
           width: panelFlick.width
           spacing: Style.space(12)
 
+          Item {
+            id: header
+            width: parent.width
+            implicitHeight: hero.implicitHeight
+
+            // The hero's trailingControl resolves `root` to PanelHero, so panel
+            // state has to be reached through this wrapper.
+            readonly property int navIndex: root.indexOfRow("power", -1)
+            readonly property bool switchHasCursor: root.cursorActive && root.rowIndex === navIndex
+            function focusSwitch() { root.setCursor(header.navIndex) }
+
           PanelHero {
             id: hero
             width: parent.width
@@ -270,6 +326,8 @@ Panel {
                 checked: discord.running
                 busy: discord.busy
                 foreground: hero.foreground
+                hasCursor: header.switchHasCursor
+                onHovered: function (on) { if (on) header.focusSwitch() }
                 onToggled: discord.running ? discord.quit() : discord.launch()
 
                 PanelToolTip {
@@ -279,6 +337,7 @@ Panel {
                 }
               }
             }
+          }
           }
 
           Text {
@@ -301,8 +360,8 @@ Panel {
 
           InfoPair {
             visible: discord.running
-            label: "Footprint"
-            value: Model.formatFootprint(discord.memoryMib, discord.processCount)
+            label: "RAM usage"
+            value: Model.formatUsage(discord.memoryMib, discord.processCount)
           }
 
           PanelSeparator {
@@ -349,6 +408,113 @@ Panel {
           }
 
           PanelSeparator {
+            visible: root.setupVisible
+            foreground: root.foreground
+          }
+
+          Column {
+            visible: root.setupVisible
+            width: parent.width
+            spacing: Style.space(10)
+
+            PanelSectionHeader {
+              text: "VOICE CONTROLS"
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+            }
+
+            Column {
+              width: parent.width
+              spacing: Style.space(6)
+
+              ActionRow {
+                visible: !root.setupOpen
+                width: parent.width
+                kind: "setup"
+                glyph: "󰒓"
+                label: "Set up voice controls"
+                sub: "Channel name, deafen and hang up"
+                onTriggered: root.setupOpen = true
+              }
+
+              Column {
+                id: setupForm
+                visible: root.setupOpen
+                width: parent.width
+                spacing: Style.space(6)
+                leftPadding: Style.space(10)
+                rightPadding: Style.space(10)
+                readonly property real fieldWidth: width - leftPadding - rightPadding
+
+                Text {
+                  width: setupForm.fieldWidth
+                  text: "Create an application, add this redirect URI on its OAuth2 page, then paste the Client ID and Secret from that same page."
+                  color: root.dim
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  wrapMode: Text.WordWrap
+                }
+
+                Text {
+                  width: setupForm.fieldWidth
+                  text: root.redirectUri
+                  color: root.foreground
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  elide: Text.ElideRight
+                }
+
+                TextField {
+                  id: setupId
+                  width: setupForm.fieldWidth
+                  placeholderText: "Client ID"
+                  foreground: root.foreground
+                  font.family: root.fontFamily
+                }
+
+                TextField {
+                  id: setupSecret
+                  width: setupForm.fieldWidth
+                  placeholderText: "Client Secret"
+                  password: true
+                  foreground: root.foreground
+                  font.family: root.fontFamily
+                }
+
+                Text {
+                  visible: root.setupError !== ""
+                  width: setupForm.fieldWidth
+                  text: root.setupError
+                  color: root.urgent
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  wrapMode: Text.WordWrap
+                }
+
+                Row {
+                  spacing: Style.space(6)
+
+                  Button {
+                    text: "Open portal"
+                    bordered: true
+                    foreground: root.foreground
+                    fontFamily: root.fontFamily
+                    onClicked: Util.execDetached("xdg-open " + Util.shellQuote("https://discord.com/developers/applications"))
+                  }
+
+                  Button {
+                    text: "Connect"
+                    bordered: true
+                    foreground: root.foreground
+                    fontFamily: root.fontFamily
+                    onClicked: root.submitSetup()
+                  }
+                }
+              }
+            }
+          }
+
+          PanelSeparator {
             foreground: root.foreground
           }
 
@@ -386,19 +552,8 @@ Panel {
                 kind: "open"
                 glyph: "󰍹"
                 label: discord.running ? "Show Discord" : "Start Discord"
-                sub: discord.running ? "Running with no window — ask it to open one" : "Launch the desktop app"
                 actionEnabled: discord.installed
                 onTriggered: { discord.open(); root.close() }
-              }
-
-              ActionRow {
-                visible: discord.running
-                width: parent.width
-                kind: "quit"
-                glyph: "󰐥"
-                label: "Quit Discord"
-                sub: Model.formatMemory(discord.memoryMib) + " back"
-                onTriggered: discord.quit()
               }
             }
           }
@@ -493,6 +648,16 @@ Panel {
             }
           }
         }
+      }
+
+      Text {
+        text: Model.pingGlyph(root.pingQuality)
+        color: root.pingQuality === "poor" ? root.urgent
+          : (root.pingQuality === "good" ? root.foreground : root.dim)
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.icon
+        Layout.alignment: Qt.AlignVCenter
+        Layout.rightMargin: Style.space(2)
       }
 
       CallButton {
@@ -794,7 +959,7 @@ Panel {
 
         Text {
           Layout.fillWidth: true
-          text: windowRow.toplevel && windowRow.toplevel.title ? windowRow.toplevel.title : "Discord"
+          text: Model.windowTitle(windowRow.toplevel)
           color: root.foreground
           font.family: root.fontFamily
           font.pixelSize: Style.font.body

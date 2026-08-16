@@ -28,6 +28,8 @@ Item {
   property bool deaf: false
   property int inputVolume: 100
   property var speaking: []
+  property int ping: 0
+  property string voiceState: ""
 
   readonly property bool connected: ready && error === ""
   readonly property bool inVoice: connected && channel !== ""
@@ -38,6 +40,8 @@ Item {
     channel = ""
     guild = ""
     speaking = []
+    ping = 0
+    voiceState = ""
   }
 
   // Setup happens in a terminal while the shell keeps running, so opening the
@@ -78,6 +82,8 @@ Item {
     root.deaf = state.deaf === true
     root.inputVolume = Math.round(Number(state.inputVolume) || 0)
     root.speaking = state.speaking instanceof Array ? state.speaking : []
+    root.ping = Math.round(Number(state.ping) || 0)
+    root.voiceState = String(state.voiceState || "")
     root.ready = true
   }
 

@@ -123,3 +123,16 @@ Hard-won findings. Re-verify before changing the code that depends on them.
   QString; Discord frames every message with a binary `<II` header, and pushing
   those bytes through UTF-8 corrupts anything above 0x7F. A binary-capable
   process is a requirement, not a shortcut.
+- **Call quality comes from `VOICE_CONNECTION_STATUS`.** Subscribing to it
+  yields `{"state": "VOICE_CONNECTED", "average_ping": 36, "last_ping": 35,
+  "hostname": "...", "pings": [...]}` — verified live. It fires several times a
+  second, so the bridge only re-emits when the state or the ping rounded to
+  `PING_ROUND_MS` changes.
+- **Omarchy has no green or yellow.** `Color` exposes `foreground`,
+  `background`, `accent`, `urgent` and `muted` — that is the whole palette. So
+  Discord's green/yellow/red quality dot is expressed as glyph *strength* first
+  (the network panel's `wifi-strength` arcs, full → outline) and colour second
+  (`foreground` → `dim` → `urgent`). Inventing a green would break every theme.
+- **The panel writes credentials over stdin, never argv.** `rpc.py --save`
+  reads one JSON object from stdin, so the secret never appears in a command
+  line or in `ps`. Same validation as `--setup`, including the Public Key check.

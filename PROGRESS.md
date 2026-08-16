@@ -93,6 +93,27 @@ meter under the name. That replaced four stacked full-width rows.
    mic gain, leave call, and that the mic row now moves Discord's own mute.
 4. Confirm the bar dot follows Discord's mute rather than the capture stream.
 
+## Phase 3 — setup without a terminal, and call quality: DONE
+
+- **Setup moved into the panel.** With no credentials the panel grows one
+  discreet `Set up voice controls` row; opening it reveals the redirect URI,
+  a Client ID field and a masked Client Secret field, plus *Open portal* and
+  *Connect*. `Connect` runs `rpc.py --save`, which reads the pair from **stdin**
+  so the secret never touches argv, then retries the bridge — no shell restart.
+  Verified by staging the credentials away, screenshotting both states, and
+  restoring through the same `--save` path the button drives.
+- **Call quality indicator.** The bridge subscribes to
+  `VOICE_CONNECTION_STATUS` and reports the average ping. Discord draws that
+  green/yellow/red; Omarchy has no green, so it is drawn as signal-strength
+  arcs (full → outline) coloured `foreground` → `dim` → `urgent`, sitting where
+  Discord puts it — left of the call buttons. The ping in milliseconds only
+  appears in the subtitle when the connection is not good.
+- **Cleanups**: `Footprint` → `RAM usage`; the quit row is gone because the
+  hero switch already did that job and its subtitle repeated the RAM figure, so
+  the hero switch became a keyboard stop the way Dropbox's is; window titles
+  drop the ` - Discord` suffix every one of them carries; the "Show Discord"
+  row lost a subtitle the hero meta already said.
+
 ## Known unknowns
 
 - **Does a capture stream appear when the mic is unmuted?** Observed for ~5
