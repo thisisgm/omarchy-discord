@@ -56,6 +56,10 @@ class RpcError(Exception):
     """Carries a message meant for the user, not a stack trace."""
 
 
+class RpcRejected(RpcError):
+    """Discord refused one command; the connection itself is still good."""
+
+
 def warn(message):
     sys.stderr.write("omarchy-discord: %s\n" % message)
     sys.stderr.flush()
@@ -110,8 +114,9 @@ def write_private(path, payload):
     """Write JSON readable only by its owner, and never briefly wider."""
     os.makedirs(os.path.dirname(path), mode=TOKEN_DIR_MODE, exist_ok=True)
     temporary = path + ".tmp"
-    # O_CREAT with the mode, so the secret is never on disk world-readable.
     descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, TOKEN_MODE)
+    # O_CREAT ignores its mode on a leftover temporary, so narrow the fd itself.
+    os.fchmod(descriptor, TOKEN_MODE)
     with os.fdopen(descriptor, "w") as handle:
         json.dump(payload, handle)
     os.replace(temporary, path)
@@ -257,7 +262,7 @@ class Rpc:
                     self.deferred.append(payload)
                 continue
             if payload.get("evt") == "ERROR":
-                raise RpcError((payload.get("data") or {}).get("message", "RPC error"))
+                raise RpcRejected((payload.get("data") or {}).get("message", "RPC error"))
             return payload.get("data") or {}
 
 
@@ -429,7 +434,11 @@ class Bridge:
                 line = COMMANDS.get_nowait()
             except queue.Empty:
                 return
-            self.handle_command(line)
+            # A refused command is not a dead socket, so it must not end the session.
+            try:
+                self.handle_command(line)
+            except RpcRejected as error:
+                warn("Discord refused that command: %s" % error)
 
     def drain_deferred(self):
         changed = False
