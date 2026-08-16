@@ -27,6 +27,10 @@ Panel {
   // Discord's own call controls exist only while the bridge is in a call.
   readonly property bool callControls: discord.rpc.inVoice
 
+  // The mic row draws inside the voice section, so the cursor has to use the same test.
+  readonly property bool micRowVisible: discord.hasMicControl && !callControls
+    && (discord.inVoice || discord.hasPlayback)
+
   readonly property string pingQuality: Model.pingQuality(
     discord.rpc.ping, discord.rpc.voiceState === "VOICE_CONNECTED")
 
@@ -78,7 +82,7 @@ Panel {
   readonly property var navRows: {
     var list = []
     if (discord.installed) list.push({ kind: "power" })
-    if (discord.hasMicControl) list.push({ kind: "mic" })
+    if (callControls || micRowVisible) list.push({ kind: "mic" })
     if (callControls) list.push({ kind: "deafen" })
     if (callControls) list.push({ kind: "hangup" })
     if (callControls) list.push({ kind: "gain" })
@@ -173,9 +177,21 @@ Panel {
     function toggle(): void { root.toggle() }
     function raise(): string { discord.open(); return "ok" }
     // Discord answers the bridge asynchronously, so report the request, not the state.
-    function mute(): string { discord.toggleMic(); return "ok" }
-    function deafen(): string { discord.toggleDeaf(); return "ok" }
-    function hangup(): string { discord.hangUp(); return "ok" }
+    function mute(): string {
+      if (!discord.hasMicControl) return "no microphone to mute"
+      discord.toggleMic()
+      return "ok"
+    }
+    function deafen(): string {
+      if (!discord.voiceKnown) return "no voice bridge"
+      discord.toggleDeaf()
+      return "ok"
+    }
+    function hangup(): string {
+      if (!discord.voiceKnown) return "no voice bridge"
+      discord.hangUp()
+      return "ok"
+    }
   }
 
   Process {
@@ -303,9 +319,10 @@ Panel {
             width: parent.width
             implicitHeight: hero.implicitHeight
 
-            // trailingControl resolves `root` to PanelHero, so panel state comes through here.
+            // PanelHero is itself `id: root`, so inside its Components panel state comes through here.
             readonly property int navIndex: root.indexOfRow("power", -1)
             readonly property bool switchHasCursor: root.cursorActive && root.rowIndex === navIndex
+            readonly property color heroIconColor: discord.attention ? root.urgent : root.foreground
             function focusSwitch() { root.setCursor(header.navIndex) }
 
           PanelHero {
@@ -320,7 +337,7 @@ Panel {
             iconComponent: Component {
               DiscordIcon {
                 iconSize: Style.font.display
-                color: discord.attention ? root.urgent : root.foreground
+                color: header.heroIconColor
               }
             }
 
@@ -396,7 +413,7 @@ Panel {
 
               // Only the fallback now: with the bridge up the call row owns the mic.
               MicRow {
-                visible: discord.hasMicControl && !root.callControls
+                visible: root.micRowVisible
                 width: parent.width
               }
 
