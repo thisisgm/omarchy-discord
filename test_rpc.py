@@ -96,12 +96,29 @@ def leftover_temporary_cannot_widen_a_secret():
 def a_bad_command_value_never_raises():
     """float(None) raised TypeError and killed the command channel for good."""
     fake = FakeRpc()
-    bridge = rpc.Bridge(fake)
     with captured_warnings() as warnings:
-        bridge.handle_command('{"cmd":"inputVolume","value":null}')
-    check("a bad inputVolume warns rather than raising",
-          any("inputVolume" in line for line in warnings), warnings)
+        rpc.Bridge(fake).handle_command('{"cmd":"inputVolume","value":null}')
+    joined = " ".join(warnings)
+    # the unknown-command warn also names the command, so pin the wording
+    check("a bad inputVolume is named as needing a number",
+          "needs a number" in joined, joined)
     check("and no command reaches Discord", fake.commands == [], fake.commands)
+
+
+def a_good_command_value_reaches_discord():
+    """Positive control: without it, deleting the branch entirely reads as a pass."""
+    fake = FakeRpc()
+    rpc.Bridge(fake).handle_command('{"cmd":"inputVolume","value":42}')
+    check("a valid inputVolume reaches Discord",
+          fake.commands == [("SET_VOICE_SETTINGS", {"input": {"volume": 42.0}})],
+          fake.commands)
+
+
+def as_number_rejects_both_bad_shapes():
+    """float(None) raises TypeError but float(\"loud\") raises ValueError."""
+    check("as_number rejects None", rpc.as_number(None) is None)
+    check("as_number rejects text", rpc.as_number("loud") is None)
+    check("as_number accepts a number", rpc.as_number(80) == 80.0)
 
 
 def an_unknown_command_is_named():
@@ -120,9 +137,11 @@ def a_refused_fire_and_forget_command_is_not_silent():
     with captured_warnings() as warnings:
         drive(bridge)
     joined = " ".join(warnings)
-    check("a refused fire and forget command names the command",
-          "SET_VOICE_SETTINGS" in joined, joined)
-    check("and carries Discord's message", "Invalid Channel Id" in joined, joined)
+    # a generic unexpected-frame warn would quote both, so pin the refusal wording
+    check("a refused fire and forget command is reported as a refusal",
+          joined.startswith("Discord refused"), joined)
+    check("naming the command", "SET_VOICE_SETTINGS" in joined, joined)
+    check("and carrying Discord's message", "Invalid Channel Id" in joined, joined)
 
 
 def the_public_key_is_refused_as_a_secret():
@@ -137,11 +156,33 @@ def the_public_key_is_refused_as_a_secret():
 
 
 def a_clipped_warning_marks_the_cut():
-    long_line = '{"cmd":"inputVolume","value":' + "9" * (rpc.WARN_INPUT_CHARS + 10) + "}"
-    clipped = rpc.clip(long_line, rpc.WARN_INPUT_CHARS)
-    check("an over-long input is marked as clipped", clipped.endswith("..."), clipped)
+    """Testing clip() alone leaves a call site free to go back to a bare slice."""
+    padding = "9" * (rpc.WARN_INPUT_CHARS + 10)
+    with captured_warnings() as warnings:
+        rpc.Bridge(FakeRpc()).handle_command("not json " + padding)
+    joined = " ".join(warnings)
+    check("an over-long command is clipped where it is warned", "..." in joined, joined)
+    check("and the whole input is not echoed", padding not in joined, joined)
     check("a short input is left alone",
           rpc.clip(' {"cmd":"mute"} ', rpc.WARN_INPUT_CHARS) == '{"cmd":"mute"}')
+
+
+def a_refusal_warning_clips_the_command():
+    """The other clip call site, on the path a refused command takes."""
+
+    class RefusingRpc(FakeRpc):
+        def request(self, cmd, args=None, evt=None):
+            raise rpc.RpcRejected("Invalid Channel Id")
+
+    padding = "9" * (rpc.WARN_INPUT_CHARS + 10)
+    while not rpc.COMMANDS.empty():
+        rpc.COMMANDS.get_nowait()
+    rpc.COMMANDS.put('{"cmd":"refresh","pad":"' + padding + '"}')
+    with captured_warnings() as warnings:
+        rpc.Bridge(RefusingRpc()).drain_commands()
+    joined = " ".join(warnings)
+    check("a refusal warning clips the command", "..." in joined, joined)
+    check("and does not echo the whole input", padding not in joined, joined)
 
 
 def a_refusal_is_still_an_rpc_error():
@@ -153,10 +194,13 @@ def a_refusal_is_still_an_rpc_error():
 def main():
     for case in (leftover_temporary_cannot_widen_a_secret,
                  a_bad_command_value_never_raises,
+                 a_good_command_value_reaches_discord,
+                 as_number_rejects_both_bad_shapes,
                  an_unknown_command_is_named,
                  a_refused_fire_and_forget_command_is_not_silent,
                  the_public_key_is_refused_as_a_secret,
                  a_clipped_warning_marks_the_cut,
+                 a_refusal_warning_clips_the_command,
                  a_refusal_is_still_an_rpc_error):
         case()
     print("\n%d failed" % len(FAILURES) if FAILURES else "\nall passed")
