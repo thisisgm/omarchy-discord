@@ -438,7 +438,7 @@ class Bridge:
             try:
                 self.handle_command(line)
             except RpcRejected as error:
-                warn("Discord refused that command: %s" % error)
+                warn("Discord refused %s: %s" % (line.strip()[:80], error))
 
     def drain_deferred(self):
         changed = False
@@ -470,6 +470,12 @@ class Bridge:
                 raise RpcError(payload.get("message", "Discord closed the connection"))
             if op == OP_PING:
                 self.rpc.send(OP_PONG, payload)
+                continue
+            # Nobody is waiting on a fire and forget command, so warn here.
+            if payload.get("evt") == "ERROR":
+                warn("Discord refused %s: %s"
+                     % (payload.get("cmd"),
+                        (payload.get("data") or {}).get("message", "unknown error")))
                 continue
             if payload.get("cmd") == "DISPATCH" and self.handle_event(
                     payload.get("evt"), payload.get("data") or {}):

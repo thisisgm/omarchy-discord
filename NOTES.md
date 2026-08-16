@@ -152,3 +152,12 @@ Hard-won findings. Re-verify before changing the code that depends on them.
   `Style.font.bodySmall`, glyphs `Style.font.icon`. Leading glyphs still drift a few
   pixels between rows because side bearings differ per glyph; first-party has
   the same drift and only corrects it for bar icons, via `OpticalGlyph`.
+- **A refused command is warned, not escalated, and that is a deliberate limit.**
+  `RpcRejected` marks one command Discord turned down; a dead socket still
+  raises plain `RpcError` and still ends the session for `main()` to reconnect.
+  Telling an auth-fatal refusal (expired or revoked token) from an ordinary one
+  would mean keying on Discord's numeric error codes, and none of them have been
+  verified against the live socket here, so the code does not guess at them. The
+  failure is loud rather than silent: the refusal warns on stderr naming the
+  command, and `Rpc.qml` surfaces stderr. Session start already refreshes the
+  token through `valid_token`.
