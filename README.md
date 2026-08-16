@@ -11,10 +11,8 @@ size and sits at the same ink weight as its neighbours:
 
 ![The widget in the bar, between the tray and the network icons](docs/bar.png)
 
-While you are in a call it grows a dot, and that dot turns the theme's urgent
-color whenever the call cannot hear you, which is the state above:
-
-![The bar icon magnified, with the call dot](docs/bar-icon.png)
+While you are in a call the icon grows a dot, and that dot turns the theme's
+urgent color whenever the call cannot hear you, which is the state above.
 
 ## What it tells you
 

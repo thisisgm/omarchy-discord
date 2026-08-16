@@ -24,3 +24,4 @@ records what changed and when.
 | [discord-tray-item](discord-tray-item.md) | the duplicate tray icon, and why the fix is one manual step |
 | [qt-svg-arc-flags](qt-svg-arc-flags.md) | why the shipped icon path has no arcs left in it |
 | [omarchy-bar-icon-weight](omarchy-bar-icon-weight.md) | matching a bar icon to its neighbours is about ink, not height |
+| [plugin-design-decisions](plugin-design-decisions.md) | the choices that are not obvious from the code, and what each one cost |

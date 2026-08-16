@@ -174,7 +174,7 @@ function pingGlyph(quality) {
 // ---------------------------------------------------------------- format
 
 function formatMemory(mib) {
-  if (!(mib > 0)) return "—"
+  if (!(mib > 0)) return "--"
   if (mib >= MIB_PER_GIB) return (mib / MIB_PER_GIB).toFixed(1) + " GiB"
   return Math.round(mib) + " MiB"
 }
@@ -190,7 +190,7 @@ function windowTitle(toplevel) {
 }
 
 function formatUsage(mib, count) {
-  if (!(count > 0)) return "—"
+  if (!(count > 0)) return "--"
   var processes = count === 1 ? "1 process" : count + " processes"
   return formatMemory(mib) + " · " + processes
 }

@@ -1,8 +1,9 @@
 # Contributing
 
-Bug reports, patches and platform facts are all welcome. This file is the short
-version; `AGENTS.md` is the same ground in more detail, and `NOTES.md` holds
-every fact the code depends on.
+Bug reports, patches and platform facts are all welcome. Every fact the code
+depends on lives in `knowledge/`, measured on a running machine rather than
+inferred, so read that before changing PipeWire matching, the window class, the
+icon path or the RPC handling.
 
 ## Two copies, one direction
 
@@ -50,7 +51,7 @@ The code is deliberately boring, because boring code survives a 3am page.
   states this platform cannot produce, and modes nobody runs are defects wearing
   the costume of thoroughness. The manifest has exactly one setting on purpose.
 - **Prove platform facts, do not code for hypotheticals.** Every claim in
-  `NOTES.md` was checked with `hyprctl`, `pw-dump`, `ps`, or a render. If a
+  `knowledge/` was checked with `hyprctl`, `pw-dump`, `ps`, or a render. If a
   review comment describes a state this platform cannot reach, answer it with
   the platform fact rather than with more code.
 - **One line per comment.** Two stacked comment lines is a paragraph. State the

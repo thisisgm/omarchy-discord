@@ -15,9 +15,10 @@ answered for the muted case.
 
 ## 2026-08-16
 
-Bundle created for the first public release. Seven facts carried over from the
-project's `NOTES.md`, each one measured on minipc, an Omarchy 4.0.0 machine
-running the Arch `discord` package version app-1.0.154.
+Bundle created for the first public release, and it is now the only home for
+these facts: the working notes they came from were internal scaffolding and are
+not published. Each one was measured on minipc, an Omarchy 4.0.0 machine running
+the Arch `discord` package version app-1.0.154.
 
 Two questions are recorded as open rather than answered, because settling them
 needs a live call that had not happened yet: whether Discord publishes a capture
