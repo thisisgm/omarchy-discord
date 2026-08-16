@@ -126,18 +126,22 @@ def a_refused_fire_and_forget_command_is_not_silent():
 
 
 def the_public_key_is_refused_as_a_secret():
-    check("64 hex characters read as the Public Key",
-          rpc.looks_like_public_key("f" * 64))
-    check("64 non-hex characters do not", not rpc.looks_like_public_key("g" * 64))
-    check("63 hex characters do not", not rpc.looks_like_public_key("f" * 63))
+    exact = rpc.PUBLIC_KEY_LENGTH
+    check("the right length of hex reads as the Public Key",
+          rpc.looks_like_public_key("f" * exact))
+    check("the right length of non-hex does not",
+          not rpc.looks_like_public_key("g" * exact))
+    check("hex one character short does not",
+          not rpc.looks_like_public_key("f" * (exact - 1)))
     check("a real secret does not", not rpc.looks_like_public_key("s3cr3t"))
 
 
 def a_clipped_warning_marks_the_cut():
-    long_line = '{"cmd":"inputVolume","value":' + "9" * 90 + "}"
+    long_line = '{"cmd":"inputVolume","value":' + "9" * (rpc.WARN_INPUT_CHARS + 10) + "}"
     clipped = rpc.clip(long_line, rpc.WARN_INPUT_CHARS)
     check("an over-long input is marked as clipped", clipped.endswith("..."), clipped)
-    check("a short input is left alone", rpc.clip(' {"cmd":"mute"} ', 80) == '{"cmd":"mute"}')
+    check("a short input is left alone",
+          rpc.clip(' {"cmd":"mute"} ', rpc.WARN_INPUT_CHARS) == '{"cmd":"mute"}')
 
 
 def a_refusal_is_still_an_rpc_error():
