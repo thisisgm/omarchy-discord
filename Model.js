@@ -140,6 +140,24 @@ function parseProcesses(raw) {
   return { count: count, memoryMib: rssKib / KIB_PER_MIB, mainPid: mainPid }
 }
 
+// -------------------------------------------------------------------- rpc
+
+// lines look like {"ok":true,"channel":"General","guild":"GM's Server","mute":false,"speaking":["gm"]}
+function parseRpcLine(raw) {
+  try {
+    var state = JSON.parse(String(raw))
+    return state && typeof state === "object" ? state : null
+  } catch (error) {
+    return null
+  }
+}
+
+// "General" names half the voice channels in existence, so say whose it is.
+function callPlace(channel, guild) {
+  if (!channel) return ""
+  return guild ? channel + " · " + guild : String(channel)
+}
+
 // ---------------------------------------------------------------- format
 
 function formatMemory(mib) {
@@ -159,7 +177,12 @@ function statusPhrase(service) {
   if (!service.installed) return "Not installed"
   if (!service.running) return "Not running"
   if (service.attention) return "Wants your attention"
-  if (service.inVoice) return service.micLive ? "In a call" : "In a call · mic closed"
+  if (service.inVoice) {
+    // The bridge knows which call; PipeWire only knows that there is one.
+    var place = callPlace(service.callChannel, service.callGuild)
+    if (place === "") return service.micLive ? "In a call" : "In a call · mic closed"
+    return service.micLive ? place : place + " · muted"
+  }
   if (!service.hasWindow) return "Running in the background"
   if (service.workspace !== "") return "Open on workspace " + service.workspace
   return "Running"

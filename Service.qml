@@ -50,14 +50,30 @@ Item {
   readonly property var captureNode: Model.findDiscordStream(streamNodes, false)
   readonly property var playbackNode: Model.findDiscordStream(streamNodes, true)
 
-  // The voice engine holds streams only while connected to a call.
-  readonly property bool inVoice: Model.hasVoiceStream(streamNodes)
+  // The voice engine holds streams only while connected to a call; the bridge
+  // names the call outright when it is configured.
+  readonly property bool inVoice: bridge.inVoice || Model.hasVoiceStream(streamNodes)
   readonly property bool hasPlayback: playbackNode !== null
 
-  // The capture stream is absent while Discord has the microphone closed, so
-  // there is nothing to mute at the PipeWire level until it appears.
-  readonly property bool hasMicControl: captureNode !== null
-  readonly property bool micMuted: captureNode && captureNode.audio ? captureNode.audio.muted : false
+  // Discord's own voice state, when a registered application is configured.
+  // Every property below falls back to PipeWire when it is not.
+  Rpc {
+    id: bridge
+    active: root.running
+  }
+
+  readonly property alias rpc: bridge
+  readonly property bool voiceKnown: bridge.connected
+  readonly property string callChannel: bridge.channel
+  readonly property string callGuild: bridge.guild
+
+  // Discord's own mute is the truth whenever the bridge is up. Without it the
+  // capture stream is all there is, and Discord drops that stream while the
+  // microphone is closed, so there is nothing to mute until it comes back.
+  readonly property bool hasMicControl: voiceKnown || captureNode !== null
+  readonly property bool micMuted: voiceKnown
+    ? bridge.mute
+    : (captureNode && captureNode.audio ? captureNode.audio.muted : false)
   readonly property bool micLive: hasMicControl && !micMuted
   readonly property real appVolume: playbackNode && playbackNode.audio ? playbackNode.audio.volume : 0
   readonly property bool appMuted: playbackNode && playbackNode.audio ? playbackNode.audio.muted : false
@@ -112,8 +128,26 @@ Item {
     settle()
   }
 
+  // Discord's own mute when the bridge is up: it survives the mic closing and
+  // shows in Discord's UI, neither of which muting a PipeWire stream does.
   function toggleMic() {
+    if (voiceKnown) {
+      bridge.setMute(!bridge.mute)
+      return
+    }
     if (captureNode && captureNode.audio) captureNode.audio.muted = !captureNode.audio.muted
+  }
+
+  function toggleDeaf() {
+    if (voiceKnown) bridge.setDeaf(!bridge.deaf)
+  }
+
+  function hangUp() {
+    if (voiceKnown) bridge.hangUp()
+  }
+
+  function setMicGain(value) {
+    if (voiceKnown) bridge.setInputVolume(Math.max(0, Math.min(100, value)))
   }
 
   function toggleAppMute() {

@@ -21,6 +21,11 @@ Panel {
 
   readonly property bool hideWhenStopped: setting("hideWhenStopped", false) === true
   readonly property real volumeStep: 0.05
+  // Discord's own input volume is a 0-100 percentage, not a PipeWire ratio.
+  readonly property int gainStep: 5
+
+  // Discord's own call controls exist only while the bridge is in a call.
+  readonly property bool callControls: discord.rpc.inVoice
   // The meter reads low at speech level, so scale it up to fill the bar.
   readonly property real peakScale: 1.6
 
@@ -36,7 +41,10 @@ Panel {
   readonly property var navRows: {
     var list = []
     if (discord.hasMicControl) list.push({ kind: "mic" })
+    if (callControls) list.push({ kind: "deafen" })
+    if (callControls) list.push({ kind: "gain" })
     if (discord.hasPlayback) list.push({ kind: "volume" })
+    if (callControls) list.push({ kind: "hangup" })
     for (var i = 0; i < discord.windows.length; i++) list.push({ kind: "window", windowIndex: i })
     // The window rows already focus Discord, so this row is only the way in
     // when there is no window to click.
@@ -64,8 +72,11 @@ Panel {
       return
     }
     // Left and right stay on the row and adjust it, matching the audio panel.
-    if (dx !== 0 && currentRow && currentRow.kind === "volume") {
+    if (dx === 0 || !currentRow) return
+    if (currentRow.kind === "volume") {
       discord.setAppVolume(discord.appVolume + (dx > 0 ? volumeStep : -volumeStep))
+    } else if (currentRow.kind === "gain") {
+      discord.setMicGain(discord.rpc.inputVolume + (dx > 0 ? gainStep : -gainStep))
     }
   }
 
@@ -78,6 +89,8 @@ Panel {
     if (!currentRow) return
     switch (currentRow.kind) {
     case "mic": discord.toggleMic(); break
+    case "deafen": discord.toggleDeaf(); break
+    case "hangup": discord.hangUp(); break
     case "volume": discord.toggleAppMute(); break
     case "window": discord.focusWindow(discord.windows[currentRow.windowIndex]); root.close(); break
     case "open": discord.open(); root.close(); break
@@ -119,7 +132,11 @@ Panel {
     function hide(): void { root.close() }
     function toggle(): void { root.toggle() }
     function raise(): string { discord.open(); return "ok" }
-    function mute(): string { discord.toggleMic(); return discord.micMuted ? "muted" : "live" }
+    // Discord answers the bridge asynchronously, so report the request, not a
+    // state that has not landed yet.
+    function mute(): string { discord.toggleMic(); return "ok" }
+    function deafen(): string { discord.toggleDeaf(); return "ok" }
+    function hangup(): string { discord.hangUp(); return "ok" }
   }
 
   BarIconButton {
@@ -198,6 +215,7 @@ Panel {
       onTextKey: function (t) {
         if (t === "o" || t === "O") { discord.open(); root.close() }
         else if (t === "m" || t === "M") discord.toggleMic()
+        else if (t === "d" || t === "D") discord.toggleDeaf()
         else if (t === "r" || t === "R") discord.refresh()
       }
 
@@ -254,9 +272,15 @@ Panel {
           }
 
           Text {
-            visible: discord.lastError !== ""
+            // A bridge nobody set up is not an error, so it stays quiet until
+            // credentials exist. See README.
+            readonly property string message: discord.lastError !== ""
+              ? discord.lastError
+              : (discord.rpc.configured ? discord.rpc.error : "")
+
+            visible: message !== ""
             width: parent.width
-            text: discord.lastError
+            text: message
             color: root.urgent
             font.family: root.fontFamily
             font.pixelSize: Style.font.bodySmall
@@ -304,14 +328,59 @@ Panel {
               fontFamily: root.fontFamily
             }
 
+            // Not a cursor stop: it reports, it does not do anything.
+            Row {
+              visible: root.callControls && discord.rpc.speaking.length > 0
+              width: parent.width
+              leftPadding: Style.space(10)
+              rightPadding: Style.space(10)
+              spacing: Style.space(8)
+
+              Text {
+                text: "󰗋"
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+
+              Text {
+                width: parent.width - parent.leftPadding - parent.rightPadding - Style.space(8) - parent.children[0].implicitWidth
+                text: discord.rpc.speaking.join(", ")
+                color: root.dim
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                elide: Text.ElideRight
+              }
+            }
+
             MicRow {
               visible: discord.hasMicControl
+              width: parent.width
+            }
+
+            DeafenRow {
+              visible: root.callControls
+              width: parent.width
+            }
+
+            GainRow {
+              visible: root.callControls
               width: parent.width
             }
 
             VolumeRow {
               visible: discord.hasPlayback
               width: parent.width
+            }
+
+            ActionRow {
+              visible: root.callControls
+              width: parent.width
+              kind: "hangup"
+              glyph: "󰏵"
+              label: "Leave call"
+              sub: Model.callPlace(discord.callChannel, discord.callGuild)
+              onTriggered: discord.hangUp()
             }
           }
 
@@ -520,6 +589,126 @@ Panel {
     }
   }
 
+  component DeafenRow: CursorSurface {
+    id: deafenRow
+    readonly property int navIndex: root.indexOfRow("deafen", -1)
+
+    hasCursor: root.cursorActive && root.rowIndex === navIndex
+    foreground: root.foreground
+    implicitHeight: deafenContent.implicitHeight + Style.spacing.rowPaddingX
+
+    MouseArea {
+      anchors.fill: parent
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onEntered: root.setCursor(deafenRow.navIndex)
+      onClicked: discord.toggleDeaf()
+    }
+
+    RowLayout {
+      id: deafenContent
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.leftMargin: Style.space(10)
+      anchors.rightMargin: Style.space(10)
+      spacing: Style.space(8)
+
+      Text {
+        text: discord.rpc.deaf ? "󰟎" : "󰋋"
+        color: discord.rpc.deaf ? root.urgent : root.foreground
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.icon
+        Layout.alignment: Qt.AlignVCenter
+      }
+
+      Text {
+        Layout.fillWidth: true
+        // Deafening mutes you too, which is worth saying before they click it.
+        text: discord.rpc.deaf ? "Deafened · nobody heard" : "Hearing the call"
+        color: root.foreground
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+        elide: Text.ElideRight
+      }
+
+      ToggleSwitch {
+        checked: !discord.rpc.deaf
+        foreground: root.foreground
+        hasCursor: deafenRow.hasCursor
+        onToggled: discord.toggleDeaf()
+        onHovered: function (on) { if (on) root.setCursor(deafenRow.navIndex) }
+        Layout.alignment: Qt.AlignVCenter
+      }
+    }
+  }
+
+  component GainRow: CursorSurface {
+    id: gainRow
+    readonly property int navIndex: root.indexOfRow("gain", -1)
+
+    hasCursor: root.cursorActive && root.rowIndex === navIndex
+    foreground: root.foreground
+    implicitHeight: gainContent.implicitHeight + Style.spacing.rowPaddingX
+
+    MouseArea {
+      anchors.fill: parent
+      hoverEnabled: true
+      acceptedButtons: Qt.NoButton
+      onEntered: root.setCursor(gainRow.navIndex)
+    }
+
+    RowLayout {
+      id: gainContent
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.leftMargin: Style.space(10)
+      anchors.rightMargin: Style.space(10)
+      spacing: Style.space(8)
+
+      Text {
+        text: "󰘮"
+        color: root.foreground
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.icon
+        Layout.alignment: Qt.AlignVCenter
+      }
+
+      ColumnLayout {
+        Layout.fillWidth: true
+        spacing: Style.space(3)
+
+        Text {
+          Layout.fillWidth: true
+          text: "Mic gain"
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+          elide: Text.ElideRight
+        }
+
+        PanelSlider {
+          Layout.fillWidth: true
+          bar: root.bar
+          value: discord.rpc.inputVolume
+          minimum: 0
+          maximum: 100
+          step: root.gainStep
+          onMoved: function (v) { discord.setMicGain(v) }
+        }
+      }
+
+      Text {
+        text: discord.rpc.inputVolume + "%"
+        color: root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.bodySmall
+        Layout.alignment: Qt.AlignVCenter
+      }
+    }
+  }
+
   component WindowRow: CursorSurface {
     id: windowRow
     property var toplevel: null
@@ -624,7 +813,7 @@ Panel {
 
       Text {
         text: actionRow.glyph
-        color: actionRow.kind === "quit" ? root.urgent : root.foreground
+        color: actionRow.kind === "quit" || actionRow.kind === "hangup" ? root.urgent : root.foreground
         font.family: root.fontFamily
         font.pixelSize: Style.font.icon
         Layout.alignment: Qt.AlignVCenter

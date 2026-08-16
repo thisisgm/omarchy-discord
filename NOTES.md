@@ -43,3 +43,19 @@ Hard-won findings. Re-verify before changing the code that depends on them.
   manage popup writes the same field, so a mismatched id is one right-click to
   fix. Not observable live: Discord registered no SNI item at all during this
   session, window open and 9 processes up, so only the config is proven.
+- **There is no anonymous route to Discord's RPC socket.** The handshake refuses
+  an unregistered client id (`{"code":4000,"message":"Invalid Client ID"}`,
+  verified). Client ids are public so the plugin could ship one, but the `rpc`
+  scope is approval-gated and, per Discord's docs, an unapproved app only
+  authorizes for accounts on its App Testers list — so a shipped id would work
+  for the author alone. Documented restriction, not measured here.
+- **Accessibility is not a way round it.** at-spi2-core is installed and
+  `org.a11y.Bus` runs, but the registry fails to activate
+  (`Could not activate remote peer 'org.a11y.atspi.Registry': unit failed`) and
+  `org.gnome.desktop.interface toolkit-accessibility` is false, so nothing is
+  published to read. Electron would also need `--force-renderer-accessibility`,
+  and scraping voice-panel labels would break on any Discord redesign.
+- **Test the RPC panel without Discord credentials** by swapping the live copy's
+  `rpc.py` for a stub that prints the same one-JSON-object-per-line state and
+  echoes commands back. That exercises `Rpc.qml`, every new row, the nav order,
+  and the glyphs. Restore the real file afterwards and `cmp` it against the repo.

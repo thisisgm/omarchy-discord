@@ -41,7 +41,7 @@ user every upstream tray fix. The `hidden` list is the shell's own affordance
 for exactly this and is one right-click to undo. README documents the manual
 route so the plugin is correct for anyone else installing it.
 
-## Phase 2 — Discord RPC: written, inert, BLOCKED
+## Phase 2 — Discord RPC: built and wired, awaiting credentials
 
 `rpc.py` is complete and syntax-clean. It owns Discord's binary RPC socket and
 speaks line-delimited JSON, giving QML what PipeWire cannot see: the voice
@@ -62,16 +62,29 @@ Then: `python3 rpc.py --probe` should print the logged-in username. First real
 run triggers a consent modal inside Discord and caches a token to
 `~/.local/state/omarchy-discord/token.json` (0600).
 
+`Rpc.qml` owns the process, parses its lines, and sends commands on stdin.
+`Service.qml` prefers it over PipeWire for mute and call state and falls back
+automatically. The panel gains the call name in the hero, a speaking line,
+deafen, mic gain, and a leave-call row.
+
+**Verified without credentials** by swapping the live `rpc.py` for a stub that
+speaks the same protocol (method in `NOTES.md`): every row rendered, all glyphs
+were real, the nav order matched, and commands round-tripped. The real file was
+restored and `cmp`-checked against the repo afterwards.
+
+**Degradation verified live**: with no credentials `rpc.py` prints one error
+line, exits 2, and `Rpc.qml` stops retrying — the panel is pixel-identical to
+Phase 1 and shows no error, because a tier nobody set up is not a failure.
+
 ### Next steps, in order
 
-1. Probe, authorize once, confirm the token cache.
-2. Wire the bridge into QML: a `Process` running `rpc.py`, parsing one JSON
-   object per line into a `Rpc.qml` service. Commands go in on stdin as
-   `{"cmd":"mute","value":true}`.
-3. Panel additions: hero meta becomes `General / GM's Server`; mute and deafen
-   toggles; hang-up row; input/output volume sliders; speaking list.
-4. **Degrade cleanly.** With no credentials the panel must look exactly as it
-   does today. The RPC tier is additive, never a prerequisite.
+1. Add the credentials, then `python3 rpc.py --probe` — it should name the
+   logged-in user.
+2. Authorize once (a consent dialog appears inside Discord) and confirm the
+   token lands in `~/.local/state/omarchy-discord/token.json` at 0600.
+3. Re-check the panel against a real call: channel and guild names, deafen,
+   mic gain, leave call, and that the mic row now moves Discord's own mute.
+4. Confirm the bar dot follows Discord's mute rather than the capture stream.
 
 ## Known unknowns
 
@@ -95,6 +108,11 @@ run triggers a consent modal inside Discord and caches a token to
 - **Restart Discord** — cut. Quit plus start is two clicks, and the relaunch
   race (Electron handing a launch to a still-dying instance) could not be
   verified.
+- **Discord's own output volume slider** — cut, though `rpc.py` implements the
+  command. The panel already has a "Discord volume" slider (PipeWire, desktop
+  level) that answers the same question the same way and keeps working outside
+  a call. Two sliders both meaning "how loud is Discord" is worse than one.
+  Mic gain was kept because nothing else exposes it.
 - **`desktopId` / `windowClass` / `processName` settings** — cut. This machine
   runs the Arch `discord` package, one shape. A Flatpak or a fork is a real
   change with a real test, not a config knob.

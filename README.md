@@ -59,7 +59,7 @@ voice call. The dot is urgent-colored whenever the call cannot hear you.
 | Middle click | raise Discord, or start it |
 | Right click | mute the call mic, or refresh when not in a call |
 | Scroll | Discord's volume |
-| `o` / `m` / `r` | raise / mute mic / refresh |
+| `o` / `m` / `d` / `r` | raise / mute mic / deafen / refresh |
 | `j` `k`, `Enter` | move and activate; `h` `l` set volume on the volume row |
 
 ### Keybindings
@@ -69,12 +69,14 @@ The panel is not the only way in. Bind these anywhere:
 ```bash
 omarchy-shell discord raise    # focus the window, or start Discord
 omarchy-shell discord mute     # toggle the call microphone
+omarchy-shell discord deafen   # toggle deafen (needs the bridge, below)
+omarchy-shell discord hangup   # leave the call (needs the bridge, below)
 omarchy-shell discord toggle   # the panel
 ```
 
-`mute` is the interesting one: it mutes Discord's microphone at the PipeWire
-level, so it works from any workspace without focusing Discord, and it holds
-whatever Discord's own mute button is doing.
+`mute` is the interesting one: it works from any workspace without focusing
+Discord. Without the optional bridge it mutes Discord's microphone at the
+PipeWire level; with it, it presses Discord's own mute button.
 
 ## Settings
 
@@ -91,20 +93,42 @@ One, in Setup > Plugins: **hide the icon when Discord is not running**.
 - **Muting here is not Discord's mute button.** Discord's own UI will still
   show you as unmuted while PipeWire feeds it silence.
 
-## Why not Discord's RPC socket
+Both limits go away with the optional bridge below, which drives Discord's own
+mute instead.
 
-Discord opens `$XDG_RUNTIME_DIR/discord-ipc-0`, which can report the voice
-channel you are in and toggle Discord's own mute and deafen. It refuses any
-client id that is not a registered Discord application:
+## Optional: Discord's own voice controls
+
+Everything above needs no account, token, or setup. Four things cannot be had
+that way, because nothing outside Discord knows them: **which** channel you are
+in, Discord's own mute and deafen, and hanging up.
+
+Those come from Discord's local RPC socket, and Discord gates it. The socket
+refuses any client id that is not a registered application:
 
 ```
 {"code":4000,"message":"Invalid Client ID"}
 ```
 
-Reading voice state on top of that needs the `rpc` OAuth scope, which is
-whitelisted per-application. So the feature costs every user a trip to the
-developer portal, and this plugin stays zero-setup instead. The state above
-is enough to answer the questions a bar is for.
+Client ids are public, so the plugin could ship one — but the `rpc` scope it
+needs is approval-gated, and until an app is approved only accounts on its
+**App Testers** list may authorize. A shipped client id would therefore work
+for the author and for nobody else. There is no anonymous route.
+
+So the bridge is opt-in, and **the plugin is complete without it**: with no
+credentials `rpc.py` exits immediately and the panel is exactly what you see
+above. To turn it on:
+
+1. Create an app at <https://discord.com/developers/applications>.
+2. OAuth2 → add the redirect URI `http://localhost/omarchy-discord`.
+3. Add yourself under **App Testers**.
+4. Export `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET` where the shell can
+   see them, or put them in the 1Password Environment `rpc.py` reads.
+
+Check it with `python3 rpc.py --probe`. The first real run raises a consent
+dialog inside Discord once and caches a token in
+`~/.local/state/omarchy-discord/token.json` (0600). The panel then gains the
+call's name, deafen, mic gain, and a leave-call row, and the mic row starts
+driving Discord's own mute.
 
 ## Uninstall
 

@@ -353,8 +353,12 @@ class Bridge:
                 return
 
 
-def emit_error(message):
-    sys.stdout.write(json.dumps({"ok": False, "error": str(message)}) + "\n")
+def emit_error(message, configured=True):
+    payload = {"ok": False, "error": str(message)}
+    # The widget shows a failure but stays silent about a tier nobody set up.
+    if not configured:
+        payload["configured"] = False
+    sys.stdout.write(json.dumps(payload) + "\n")
     sys.stdout.flush()
 
 
@@ -396,9 +400,18 @@ def probe():
         rpc.close()
 
 
+EXIT_UNCONFIGURED = 2
+
+
 def main():
     if "--probe" in sys.argv:
         return probe()
+    # Credentials cannot appear while we run, so retrying would only spin.
+    try:
+        credentials()
+    except RpcError as error:
+        emit_error(error, configured=False)
+        return EXIT_UNCONFIGURED
     while True:
         try:
             session()

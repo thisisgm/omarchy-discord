@@ -38,6 +38,10 @@ qs log -p "$OMARCHY_PATH/shell" --tail 60 | grep -i thisisgm
 does not appear, `omarchy restart shell` (wait ~8s) before concluding anything
 about your edit.
 
+**The RPC panel is testable without credentials.** Swap the live copy's
+`rpc.py` for a stub printing the same JSON-per-line state, restart the shell,
+screenshot, then restore and `cmp` against the repo. Details in `NOTES.md`.
+
 **Look at it.** This is a visual component; a screenshot is the test.
 
 ```bash
