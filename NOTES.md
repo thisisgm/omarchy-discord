@@ -87,3 +87,10 @@ Hard-won findings. Re-verify before changing the code that depends on them.
   runs, plus a launch OSD, but it is a private injection documented for the
   menu's Apps submenu and no plugin under `plugins/` consumes it. Depending on
   it would be less conventional, not more.
+- **A Discord app shows three values and two of them look interchangeable.**
+  Client ID (OAuth2 page, also called Application ID on General Information) is
+  public and goes in the RPC handshake. Client Secret (OAuth2 page, behind Reset
+  Secret) buys the token. Public Key (General Information) is an Ed25519 key for
+  verifying interaction webhook signatures — exactly 64 hex characters, useless
+  here, and the easy thing to paste by mistake, so `--setup` detects that shape
+  and says so instead of failing later inside the token exchange.

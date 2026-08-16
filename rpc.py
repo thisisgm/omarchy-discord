@@ -28,6 +28,8 @@ TOKEN_DIR_MODE = 0o700
 REFRESH_MARGIN_SEC = 300
 RECONNECT_DELAY_SEC = 5
 SECRETS_READ_TIMEOUT_SEC = 5
+PUBLIC_KEY_LENGTH = 64
+HEX_DIGITS = "0123456789abcdefABCDEF"
 
 STATE_DIR = os.path.join(
     os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")),
@@ -457,19 +459,26 @@ def setup():
     print("application of your own. This is the only setup, and it is one time.\n")
     print("1. Create an application, any name, at:")
     print("     %s" % PORTAL)
-    print("2. Open OAuth2 and add this redirect URI, exactly:")
+    print("2. Open its OAuth2 page and add this redirect URI, exactly:")
     print("     %s" % REDIRECT_URI)
-    print("3. Copy the Application ID, and the Client Secret from the same page")
-    print("   (use Reset Secret if it is hidden).\n")
+    print("3. Copy CLIENT ID and CLIENT SECRET from that same OAuth2 page.")
+    print("   Reset Secret reveals the secret. Do not use the Public Key on")
+    print("   General Information — that one signs webhooks and will not work.\n")
     open_portal()
 
-    client_id = ask("Application ID: ")
+    client_id = ask("Client ID (a long number):     ")
     if not client_id.isdigit():
-        print("\nThat is not an Application ID — it is a long number.")
+        print("\nThat is not the Client ID — it is a long number, digits only.")
         return 1
-    client_secret = ask("Client Secret:  ")
+    client_secret = ask("Client Secret (OAuth2 page):   ")
     if not client_secret:
         print("\nNo client secret given.")
+        return 1
+    # The Public Key is an Ed25519 key: 32 bytes, so exactly 64 hex characters.
+    if len(client_secret) == PUBLIC_KEY_LENGTH and all(c in HEX_DIGITS for c in client_secret):
+        print("\nThat is the Public Key, not the Client Secret — it signs")
+        print("interaction webhooks and cannot buy a token. The secret is on")
+        print("the OAuth2 page, behind Reset Secret.")
         return 1
 
     write_private(CREDENTIALS_PATH, {"client_id": client_id,

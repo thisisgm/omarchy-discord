@@ -123,10 +123,15 @@ python3 ~/.config/omarchy/plugins/io.github.thisisgm.discord/rpc.py --setup
 ```
 
 That opens the developer portal, prints the two things to create there, takes
-the Application ID and Client Secret, and then authorizes against your running
-Discord so you find out it worked before you leave the terminal. It stores the
-pair in `~/.config/omarchy-discord/credentials.json` and the token in
-`~/.local/state/omarchy-discord/token.json`, both `0600`.
+the **Client ID** and **Client Secret** — both on the application's OAuth2
+page, the secret behind *Reset Secret* — and then authorizes against your
+running Discord so you find out it worked before you leave the terminal. It
+stores the pair in `~/.config/omarchy-discord/credentials.json` and the token
+in `~/.local/state/omarchy-discord/token.json`, both `0600`.
+
+The **Public Key** on *General Information* is a different value: it verifies
+interaction webhook signatures and cannot buy a token. It is 64 hex characters,
+and `--setup` rejects it by name if you paste it.
 
 Open the panel afterwards — no restart needed — and it gains the call's name,
 deafen, mic gain, and a leave-call row, and the mic row starts driving
