@@ -62,40 +62,23 @@ Kept on purpose: the single `hideWhenStopped` setting (both first-party panels
 expose a `refreshIntervalSec` knob; this one polls on a named 20s constant and
 does not need it), and the short `ipcTarget`. Both noted in `NOTES.md`.
 
-## Phase 2 — Discord RPC: built and wired, awaiting credentials
+## Phase 2 — Discord RPC: LIVE, verified against a real call
 
 `rpc.py` is complete and syntax-clean. It owns Discord's binary RPC socket and
 speaks line-delimited JSON, giving QML what PipeWire cannot see: the voice
 channel name, Discord's own mute and deafen, input/output volume, voice mode,
 who is speaking, and hang up. Reconnects on its own and refreshes its token.
 
-**Blocked on credentials.** GM must:
+**Working since 2026-08-16.** Authorized as thisisgm with exactly three
+scopes (`rpc`, `rpc.voice.read`, `rpc.voice.write`), token cached 0600 with a
+refresh token. The panel shows the live channel, deafen, mic gain and leave
+call. Three bugs had to be fixed against a real Discord to get there — the
+SUBSCRIBE frame shape, the missing User-Agent, and the AUTHORIZE redirect_uri
+misreading — all recorded in `NOTES.md`.
 
-1. Create an app at <https://discord.com/developers/applications>.
-2. OAuth2 → add redirect URI `http://localhost/omarchy-discord`.
-3. Add himself under App Testers — unapproved apps only work for testers, and
-   the owner qualifies. This is what makes the whole tier possible.
-4. Put `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET` into the 1Password
-   `claude-skills` Environment, **in the 1Password app directly** so the secret
-   never passes through an agent's context.
-
-Then: `python3 rpc.py --probe` should print the logged-in username. First real
-run triggers a consent modal inside Discord and caches a token to
-`~/.local/state/omarchy-discord/token.json` (0600).
-
-`Rpc.qml` owns the process, parses its lines, and sends commands on stdin.
-`Service.qml` prefers it over PipeWire for mute and call state and falls back
-automatically. The panel gains the call name in the hero, a speaking line,
-deafen, mic gain, and a leave-call row.
-
-**Verified without credentials** by swapping the live `rpc.py` for a stub that
-speaks the same protocol (method in `NOTES.md`): every row rendered, all glyphs
-were real, the nav order matched, and commands round-tripped. The real file was
-restored and `cmp`-checked against the repo afterwards.
-
-**Degradation verified live**: with no credentials `rpc.py` prints one error
-line, exits 2, and `Rpc.qml` stops retrying — the panel is pixel-identical to
-Phase 1 and shows no error, because a tier nobody set up is not a failure.
+The voice section now follows Discord's own panel: the call named on the left,
+mute/deafen/hang-up as `PanelActionButton` icons on the right, with the mic
+meter under the name. That replaced four stacked full-width rows.
 
 ### Next steps, in order
 

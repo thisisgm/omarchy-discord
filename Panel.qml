@@ -26,6 +26,15 @@ Panel {
 
   // Discord's own call controls exist only while the bridge is in a call.
   readonly property bool callControls: discord.rpc.inVoice
+
+  readonly property string callSubtitle: {
+    if (discord.rpc.deaf) return "Deafened"
+    if (discord.micMuted) return "Muted"
+    var talking = discord.rpc.speaking
+    if (talking.length === 1) return talking[0] + " is talking"
+    if (talking.length > 1) return talking.join(", ") + " are talking"
+    return "Connected"
+  }
   // The meter reads low at speech level, so scale it up to fill the bar.
   readonly property real peakScale: 1.6
 
@@ -42,9 +51,9 @@ Panel {
     var list = []
     if (discord.hasMicControl) list.push({ kind: "mic" })
     if (callControls) list.push({ kind: "deafen" })
+    if (callControls) list.push({ kind: "hangup" })
     if (callControls) list.push({ kind: "gain" })
     if (discord.hasPlayback) list.push({ kind: "volume" })
-    if (callControls) list.push({ kind: "hangup" })
     for (var i = 0; i < discord.windows.length; i++) list.push({ kind: "window", windowIndex: i })
     // The window rows already focus Discord, so this row is only the way in
     // when there is no window to click.
@@ -312,42 +321,18 @@ Panel {
               fontFamily: root.fontFamily
             }
 
-            // Not a cursor stop: it reports, it does not do anything.
-            RowLayout {
-              visible: root.callControls && discord.rpc.speaking.length > 0
+            CallRow {
+              visible: root.callControls
               width: parent.width
-              spacing: Style.space(8)
-
-              Text {
-                Layout.leftMargin: Style.space(10)
-                text: "󰗋"
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              Text {
-                Layout.fillWidth: true
-                Layout.rightMargin: Style.space(10)
-                text: discord.rpc.speaking.join(", ")
-                color: root.dim
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.bodySmall
-                elide: Text.ElideRight
-              }
             }
 
             Column {
               width: parent.width
               spacing: Style.space(6)
 
+              // Only the fallback now: with the bridge up the call row owns the mic.
               MicRow {
-                visible: discord.hasMicControl
-                width: parent.width
-              }
-
-              DeafenRow {
-                visible: root.callControls
+                visible: discord.hasMicControl && !root.callControls
                 width: parent.width
               }
 
@@ -359,16 +344,6 @@ Panel {
               VolumeRow {
                 visible: discord.hasPlayback
                 width: parent.width
-              }
-
-              ActionRow {
-                visible: root.callControls
-                width: parent.width
-                kind: "hangup"
-                glyph: "󰏵"
-                label: "Leave call"
-                sub: Model.callPlace(discord.callChannel, discord.callGuild)
-                onTriggered: discord.hangUp()
               }
             }
           }
@@ -461,6 +436,102 @@ Panel {
       horizontalAlignment: Text.AlignRight
       elide: Text.ElideRight
     }
+  }
+
+  // Discord's own voice panel names the call on the left and puts mute, deafen
+  // and hang up as icons on the right. This is that row, in Omarchy's parts.
+  component CallRow: Item {
+    implicitHeight: callContent.implicitHeight + Style.spacing.rowPaddingX
+
+    RowLayout {
+      id: callContent
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.leftMargin: Style.space(10)
+      anchors.rightMargin: Style.space(10)
+      spacing: Style.space(6)
+
+      ColumnLayout {
+        Layout.fillWidth: true
+        spacing: Style.space(3)
+
+        Text {
+          Layout.fillWidth: true
+          text: Model.callPlace(discord.callChannel, discord.callGuild)
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+          elide: Text.ElideRight
+        }
+
+        Text {
+          Layout.fillWidth: true
+          text: root.callSubtitle
+          color: discord.rpc.deaf || discord.micMuted ? root.urgent : root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          elide: Text.ElideRight
+        }
+
+        // Discord draws a waveform here; this is the same thing, measured.
+        Rectangle {
+          Layout.fillWidth: true
+          height: Style.space(3)
+          radius: Style.cornerRadius > 0 ? height / 2 : 0
+          color: Util.alpha(root.foreground, 0.15)
+
+          Rectangle {
+            width: parent.width * Math.max(0, Math.min(1, micPeak.peak * root.peakScale))
+            height: parent.height
+            radius: parent.radius
+            color: discord.micMuted ? root.urgent : root.foreground
+            opacity: discord.micMuted ? 0.4 : 0.9
+
+            Behavior on width {
+              NumberAnimation { duration: 90 }
+            }
+          }
+        }
+      }
+
+      CallButton {
+        kind: "mic"
+        iconText: discord.micMuted ? "󰍭" : "󰍬"
+        tooltipText: discord.micMuted ? "Unmute" : "Mute"
+        foreground: discord.micMuted ? root.urgent : root.foreground
+        onClicked: discord.toggleMic()
+      }
+
+      CallButton {
+        kind: "deafen"
+        iconText: discord.rpc.deaf ? "󰟎" : "󰋋"
+        tooltipText: discord.rpc.deaf ? "Undeafen" : "Deafen"
+        foreground: discord.rpc.deaf ? root.urgent : root.foreground
+        onClicked: discord.toggleDeaf()
+      }
+
+      CallButton {
+        kind: "hangup"
+        iconText: "󰏵"
+        tooltipText: "Leave call"
+        hoverColor: root.urgent
+        onClicked: discord.hangUp()
+      }
+    }
+  }
+
+  // A call button is its own cursor stop, so j/k walks the icons.
+  component CallButton: PanelActionButton {
+    property string kind: ""
+    readonly property int navIndex: root.indexOfRow(kind, -1)
+
+    fontFamily: root.fontFamily
+    foreground: root.foreground
+    bordered: true
+    hasCursor: root.cursorActive && root.rowIndex === navIndex
+    onHovered: function (on) { if (on) root.setCursor(navIndex) }
+    Layout.alignment: Qt.AlignVCenter
   }
 
   component MicRow: CursorSurface {
@@ -607,60 +678,6 @@ Panel {
         color: root.dim
         font.family: root.fontFamily
         font.pixelSize: Style.font.bodySmall
-        Layout.alignment: Qt.AlignVCenter
-      }
-    }
-  }
-
-  component DeafenRow: CursorSurface {
-    id: deafenRow
-    readonly property int navIndex: root.indexOfRow("deafen", -1)
-
-    hasCursor: root.cursorActive && root.rowIndex === navIndex
-    foreground: root.foreground
-    implicitHeight: deafenContent.implicitHeight + Style.spacing.rowPaddingX
-
-    MouseArea {
-      anchors.fill: parent
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
-      onEntered: root.setCursor(deafenRow.navIndex)
-      onClicked: discord.toggleDeaf()
-    }
-
-    RowLayout {
-      id: deafenContent
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.space(10)
-      anchors.rightMargin: Style.space(10)
-      spacing: Style.space(8)
-
-      Text {
-        text: discord.rpc.deaf ? "󰟎" : "󰋋"
-        color: discord.rpc.deaf ? root.urgent : root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.icon
-        Layout.alignment: Qt.AlignVCenter
-      }
-
-      Text {
-        Layout.fillWidth: true
-        // Deafening mutes you too, which is worth saying before they click it.
-        text: discord.rpc.deaf ? "Deafened · nobody heard" : "Hearing the call"
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-        elide: Text.ElideRight
-      }
-
-      ToggleSwitch {
-        checked: !discord.rpc.deaf
-        foreground: root.foreground
-        hasCursor: deafenRow.hasCursor
-        onToggled: discord.toggleDeaf()
-        onHovered: function (on) { if (on) root.setCursor(deafenRow.navIndex) }
         Layout.alignment: Qt.AlignVCenter
       }
     }

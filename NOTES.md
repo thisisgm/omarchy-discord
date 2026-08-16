@@ -107,3 +107,19 @@ Hard-won findings. Re-verify before changing the code that depends on them.
   The HTTP token exchange still has to name it. Both errors observed live.
 - **Only three scopes are needed and granted**: `rpc`, `rpc.voice.read`,
   `rpc.voice.write`. The token carries a refresh token and a 7-day expiry.
+- **Plug-and-play is not available, and the reason is Discord's.** The `rpc`
+  scope is restricted to the application owner and up to 50 whitelisted testers
+  unless Discord approves the app for general RPC access, and the OAuth2 docs
+  are explicit that "all calls to the OAuth2 endpoints require either HTTP Basic
+  authentication or client_id and client_secret supplied in the form data body"
+  — there is no PKCE and no public-client flag that drops the secret. The only
+  zero-setup route is borrowing an already-approved app's client id (Overlayed
+  905987126099836938, Streamkit 207646673902501888 and a few others are public)
+  with the implicit grant, which needs no secret. Rejected: it puts someone
+  else's application in the user's Authorized Apps list, returns no refresh
+  token so it expires silently, and breaks whenever that app changes.
+- **The bridge cannot move into QML.** `Quickshell.Io.Socket` exists and can
+  open the unix socket, but `write()` takes a QString and the parsers emit
+  QString; Discord frames every message with a binary `<II` header, and pushing
+  those bytes through UTF-8 corrupts anything above 0x7F. A binary-capable
+  process is a requirement, not a shortcut.
