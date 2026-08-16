@@ -4,7 +4,7 @@ A bar widget for the Discord desktop app, built the way the first-party
 Dropbox and Tailscale plugins are built: vector icon, keyboard-navigable
 panel, and no configuration.
 
-![The widget in the bar](preview.png)
+![The panel, open from the bar](preview.png)
 
 ## What it tells you
 
