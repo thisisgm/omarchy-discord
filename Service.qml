@@ -87,8 +87,11 @@ Item {
 
   // ------------------------------------------------------------ actions
 
+  // Re-reads both tiers: the process poll, and Discord's own state in case a
+  // dispatch was missed. The bridge ignores this while it is down.
   function refresh() {
     if (!statusProcess.running) statusProcess.running = true
+    bridge.refresh()
   }
 
   function applyProcesses(raw) {

@@ -286,8 +286,8 @@ class Bridge:
         self.speaking = set()
         self.guilds = {}
         self.state = {"ok": True, "channel": "", "guild": "", "mute": False,
-                      "deaf": False, "inputVolume": 100, "outputVolume": 100,
-                      "mode": "", "speaking": [], "error": "",
+                      "deaf": False, "inputVolume": 100,
+                      "speaking": [], "error": "",
                       "ping": 0, "voiceState": ""}
 
     def emit(self):
@@ -300,8 +300,6 @@ class Bridge:
         self.state["mute"] = bool(data.get("mute"))
         self.state["deaf"] = bool(data.get("deaf"))
         self.state["inputVolume"] = round(float((data.get("input") or {}).get("volume", 100)))
-        self.state["outputVolume"] = round(float((data.get("output") or {}).get("volume", 100)))
-        self.state["mode"] = str((data.get("mode") or {}).get("type", ""))
 
     def guild_name(self, guild_id):
         if not guild_id:
@@ -380,10 +378,6 @@ class Bridge:
             self.rpc.command("SET_VOICE_SETTINGS", {name: bool(value)})
         elif name == "inputVolume":
             self.rpc.command("SET_VOICE_SETTINGS", {"input": {"volume": float(value)}})
-        elif name == "outputVolume":
-            self.rpc.command("SET_VOICE_SETTINGS", {"output": {"volume": float(value)}})
-        elif name == "mode":
-            self.rpc.command("SET_VOICE_SETTINGS", {"mode": {"type": str(value)}})
         elif name == "disconnect":
             self.rpc.command("SELECT_VOICE_CHANNEL", {"channel_id": None, "force": True})
         elif name == "refresh":
