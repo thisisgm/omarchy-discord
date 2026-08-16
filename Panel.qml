@@ -175,7 +175,11 @@ Panel {
     function show(): void { root.open() }
     function hide(): void { root.close() }
     function toggle(): void { root.toggle() }
-    function raise(): string { discord.open(); return "ok" }
+    function raise(): string {
+      if (!discord.installed) return "Discord is not installed"
+      discord.open()
+      return "ok"
+    }
     // Discord answers the bridge asynchronously, so report the request, not the state.
     function mute(): string {
       if (!discord.hasMicControl) return "no microphone to mute"

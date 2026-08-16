@@ -20,6 +20,8 @@ Item {
   readonly property string scriptPath: String(Qt.resolvedUrl("rpc.py")).replace("file://", "")
 
   property bool configured: true
+  // Lets one spawn through while unconfigured, so the panel keeps showing setup until the bridge answers.
+  property bool probing: false
   property bool ready: false
   property string error: ""
 
@@ -48,7 +50,7 @@ Item {
 
   // Setup happens while the shell runs, so opening the panel re-checks.
   function retry() {
-    configured = true
+    probing = true
     error = ""
     restarts = 0
     holdOff = false
@@ -65,6 +67,7 @@ Item {
   function hangUp() { send({ cmd: "disconnect" }) }
   function refresh() { send({ cmd: "refresh" }) }
 
+  // lines look like {"ok":true,"channel":"General","guild":"GM's Server","mute":false,"deaf":false,"inputVolume":100,"speaking":["gm"],"error":"","ping":36,"voiceState":"VOICE_CONNECTED"}
   function applyLine(line) {
     var state = Model.parseRpcLine(line)
     if (!state) return
@@ -72,12 +75,15 @@ Item {
     if (state.ok === false) {
       // The bridge says outright when it can never work, so stop rather than retry.
       if (state.configured === false) root.configured = false
+      root.probing = false
       root.error = String(state.error || "Discord RPC failed")
       root.ready = false
       return
     }
 
     root.error = ""
+    root.configured = true
+    root.probing = false
     root.channel = String(state.channel || "")
     root.guild = String(state.guild || "")
     root.mute = state.mute === true
@@ -93,9 +99,15 @@ Item {
   // Held down for one delay after a crash so a failing bridge cannot hot-loop.
   property bool holdOff: false
 
+  // A fresh Discord is a fresh chance, so no failure state outlives the process it belonged to.
+  onActiveChanged: if (!active) {
+    holdOff = false
+    restarts = 0
+  }
+
   Process {
     id: bridge
-    running: root.active && root.configured && !root.holdOff
+    running: root.active && (root.configured || root.probing) && !root.holdOff
     command: ["python3", root.scriptPath]
     stdinEnabled: true
 
@@ -114,13 +126,15 @@ Item {
     onRunningChanged: if (!running) root.clear()
 
     onExited: function (exitCode) {
-      if (exitCode === root.exitUnconfigured) return
+      // Discord quitting takes the bridge with it, and that is not a failure to count.
+      if (!root.active || exitCode === root.exitUnconfigured) return
+      root.holdOff = true
       root.restarts += 1
+      // Past the budget the hold is never lifted, so only retry() starts the bridge again.
       if (root.restarts > root.maxRestarts) {
         root.error = "Discord voice bridge keeps failing, see the shell log"
         return
       }
-      root.holdOff = true
       restartTimer.restart()
     }
   }
