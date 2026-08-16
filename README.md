@@ -4,7 +4,17 @@ A bar widget for the Discord desktop app, built the way the first-party
 Dropbox and Tailscale plugins are built: vector icon, keyboard-navigable
 panel, and no configuration.
 
-![The panel, open from the bar](preview.png)
+![The panel during a voice call](preview.png)
+
+The mark is drawn as vector geometry, so it takes the theme's foreground at any
+size and sits at the same ink weight as its neighbours:
+
+![The widget in the bar, between the tray and the network icons](docs/bar.png)
+
+While you are in a call it grows a dot, and that dot turns the theme's urgent
+color whenever the call cannot hear you, which is the state above:
+
+![The bar icon magnified, with the call dot](docs/bar-icon.png)
 
 ## What it tells you
 
@@ -20,6 +30,18 @@ panel, and no configuration.
 
 Nothing polls Discord's servers, and no account, token, or developer
 application is involved.
+
+## Requirements
+
+- **Omarchy Quattro.** This is built against its shell plugin contract.
+- **Discord from the Arch `discord` package.** Every signal keys off that one
+  shape: window class `discord`, desktop entry `discord.desktop`, and a process
+  called `Discord`. A Flatpak build, a fork, or Discord run as a web app
+  publishes different values and is not supported. Making those work is a real
+  change with a real test rather than a configuration knob, so the plugin does
+  not pretend otherwise.
+- **python3**, and only for the optional voice bridge at the bottom of this
+  page. Omarchy already ships it.
 
 ## Install
 
@@ -38,9 +60,9 @@ omarchy plugin enable io.github.thisisgm.discord
 ## Replace Discord's own tray icon
 
 Discord registers a tray item of its own, so out of the box you get two Discord
-icons in the bar. Omarchy already solves this for its bundled plugins — the tray
-hides Dropbox's item when the Dropbox widget is loaded — but that list lives in
-the shell and takes no plugin hook, so hide Discord's item once by hand:
+icons in the bar. Omarchy already solves this for its bundled plugins, since the
+tray hides Dropbox's item when the Dropbox widget is loaded, but that list lives
+in the shell and takes no plugin hook. So hide Discord's item once by hand:
 
 right-click the tray > **Manage** > untick Discord.
 
@@ -79,6 +101,9 @@ omarchy-shell discord toggle   # the panel
 Discord. Without the optional bridge it mutes Discord's microphone at the
 PipeWire level; with it, it presses Discord's own mute button.
 
+Each verb answers `ok`, or says why it did nothing: `no voice bridge`,
+`no microphone to mute`, `Discord is not installed`.
+
 ## Settings
 
 One, in Setup > Plugins: **hide the icon when Discord is not running**.
@@ -110,32 +135,37 @@ refuses any client id that is not a registered application:
 {"code":4000,"message":"Invalid Client ID"}
 ```
 
-Client ids are public, so the plugin could ship one — but the `rpc` scope it
+Client ids are public, so the plugin could ship one, but the `rpc` scope it
 needs is approval-gated, and until an app is approved only accounts on its
 **App Testers** list may authorize. A shipped client id would therefore work
 for the author and for nobody else. There is no anonymous route.
 
-So the bridge is opt-in, and **the plugin is complete without it**: with no
-credentials `rpc.py` exits immediately and the panel is exactly what you see
-above. To turn it on, open the panel and use **Set up voice controls** — it takes the
+So the bridge is opt-in, and **the plugin is complete without it**. With no
+credentials `rpc.py` exits immediately, the panel still knows you are in a call
+because PipeWire says so, and the voice section quietly offers to set itself up:
+
+![The panel with no credentials, offering to set up voice controls](docs/setup.png)
+
+To turn it on, open the panel and use **Set up voice controls**, which takes the
 two values inline, no terminal. The same thing from a shell, if you prefer:
 
 ```bash
 python3 ~/.config/omarchy/plugins/io.github.thisisgm.discord/rpc.py --setup
 ```
 
-That opens the developer portal, prints the two things to create there, takes
-the **Client ID** and **Client Secret** — both on the application's OAuth2
-page, the secret behind *Reset Secret* — and then authorizes against your
-running Discord so you find out it worked before you leave the terminal. It
+That opens the developer portal, prints the two things to create there, and
+takes the **Client ID** and **Client Secret**, both on the application's OAuth2
+page with the secret behind *Reset Secret*. It then authorizes against your
+running Discord, so you find out it worked before you leave the terminal. It
 stores the pair in `~/.config/omarchy-discord/credentials.json` and the token
-in `~/.local/state/omarchy-discord/token.json`, both `0600`.
+in `~/.local/state/omarchy-discord/token.json`, both `0600`. The panel writes
+those values over stdin, so a secret never appears in a command line or in `ps`.
 
 The **Public Key** on *General Information* is a different value: it verifies
 interaction webhook signatures and cannot buy a token. It is 64 hex characters,
 and `--setup` rejects it by name if you paste it.
 
-Open the panel afterwards — no restart needed — and it gains the call's name,
+Open the panel afterwards, no restart needed, and it gains the call's name,
 deafen, mic gain, and a leave-call row, and the mic row starts driving
 Discord's own mute. `--probe` re-checks it any time.
 
@@ -147,6 +177,26 @@ Testers** list; the owner is already covered.
 ```bash
 omarchy plugin remove io.github.thisisgm.discord
 ```
+
+Nothing is left behind outside the plugin folder except the two optional files
+named above and the tray entry you unticked, if you got that far.
+
+## Contributing
+
+Patches and bug reports are welcome. `CONTRIBUTING.md` has the two-copy layout,
+how to test a change against a running shell, and the house rules the code is
+held to.
+
+The platform facts this depends on, such as how PipeWire names Discord's
+streams and what the RPC handshake refuses, live in `knowledge/` as an
+[Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
+bundle. Every one of them was measured on a running machine, so the next person
+does not have to rediscover them.
+
+## Support
+
+If this saved you an afternoon, you can
+[buy me a coffee](https://buymeacoffee.com/thisisgm).
 
 ## License
 
