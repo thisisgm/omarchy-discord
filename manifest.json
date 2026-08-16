@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.thisisgm.discord",
+  "name": "Discord",
+  "version": "1.0.0",
+  "author": "GM",
+  "license": "MIT",
+  "description": "Discord in the Omarchy bar: attention badge, call state, volume, window focus, and memory footprint.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Discord",
+    "description": "Raise or launch Discord, see and control the voice call, and watch what it costs in memory.",
+    "category": "Social",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "hideWhenStopped": false
+    },
+    "schema": [
+      {
+        "key": "hideWhenStopped",
+        "type": "boolean",
+        "label": "Hide the icon when Discord is not running",
+        "defaultValue": false
+      }
+    ]
+  }
+}
