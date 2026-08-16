@@ -6,6 +6,13 @@ description: What changed in this bundle and when
 
 # Log
 
+## 2026-08-16, during a live call
+
+`discord-pipewire-streams` gained a measurement rather than a recollection: one
+Discord node, `Stream/Output/Audio` WEBRTC VoiceEngine, no capture node while
+muted, and no second playback stream. The first of its two open questions is now
+answered for the muted case.
+
 ## 2026-08-16
 
 Bundle created for the first public release. Seven facts carried over from the

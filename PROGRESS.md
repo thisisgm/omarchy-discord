@@ -91,7 +91,9 @@ meter under the name. That replaced four stacked full-width rows.
    0600. Opening the panel re-tries the bridge, so no shell restart is needed.
 3. Re-check the panel against a real call: channel and guild names, deafen,
    mic gain, leave call, and that the mic row now moves Discord's own mute.
-4. Confirm the bar dot follows Discord's mute rather than the capture stream.
+4. Done 2026-08-16: the bar dot follows the bridge rather than the capture
+   stream. During a live call with Discord reporting muted, the dot rendered in
+   `urgent` at the icon's corner with no capture node present.
 
 ## Phase 3 — setup without a terminal, and call quality: DONE
 
@@ -116,12 +118,17 @@ meter under the name. That replaced four stacked full-width rows.
 
 ## Known unknowns
 
-- **Does a capture stream appear when the mic is unmuted?** Observed for ~5
-  minutes during a live call with the mic closed and it never appeared, so
-  `hasMicControl` is written to simply hide the mic row when there is no stream.
-  If unmuting does create one, the row and the bar dot light up as designed —
-  worth confirming, since it decides whether the PipeWire mic path is useful at
-  all once RPC lands (RPC's own mute is better anyway).
+- **Does a capture stream appear when the mic is unmuted?** Still open. Measured
+  again on 2026-08-16 during a live call with the mic closed: `pw-dump` reported
+  exactly one Discord node, `Stream/Output/Audio`, WEBRTC VoiceEngine,
+  `playStream`, running, and no capture node at all. That settles the muted case
+  on live state rather than on memory, and leaves the unmuted one unobserved, so
+  `hasMicControl` still hides the mic row when there is no stream.
+- **Does a call ever publish two playback streams?** Not reproduced. A deferred
+  review finding said `findDiscordStream` needs a tie-break because Discord
+  publishes both a voice-engine stream and an app-sound stream. During the
+  2026-08-16 call there was a single node, so the ambiguous case did not occur.
+  Worth a tie-break if it ever shows up.
 - Attention (`urgent`) has not been seen fire yet; it needs an incoming mention
   while Discord is unfocused.
 - The plugin has never run on a machine without Discord installed.
