@@ -101,7 +101,7 @@ def a_bad_command_value_never_raises():
     joined = " ".join(warnings)
     # the unknown-command warn also names the command, so pin the wording
     check("a bad inputVolume is named as needing a number",
-          "needs a number" in joined, joined)
+          "inputVolume needs a number" in joined, joined)
     check("and no command reaches Discord", fake.commands == [], fake.commands)
 
 
