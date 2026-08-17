@@ -4,6 +4,9 @@ A bar widget for the Discord desktop app, built the way the first-party
 Dropbox and Tailscale plugins are built: vector icon, keyboard-navigable
 panel, and no configuration.
 
+[![On omarchyplugins.com](https://img.shields.io/badge/omarchyplugins.com-listed-8b5cf6)](https://omarchyplugins.com/plugin.html?id=io.github.thisisgm.discord)
+[![Latest tag](https://img.shields.io/github/v/tag/thisisgm/omarchy-discord?label=version)](https://github.com/thisisgm/omarchy-discord/tags)
+
 ![The panel during a voice call](preview.png)
 
 The mark is drawn as vector geometry, so it takes the theme's foreground at any
