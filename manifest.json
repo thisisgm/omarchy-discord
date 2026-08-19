@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.thisisgm.discord",
   "name": "Discord",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "author": "GM",
   "license": "MIT",
   "description": "Discord in the Omarchy bar: attention badge, call state, volume, window focus, and memory footprint.",

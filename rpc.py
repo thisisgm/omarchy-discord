@@ -123,9 +123,12 @@ def write_private(path, payload):
     """Write JSON readable only by its owner, and never briefly wider."""
     os.makedirs(os.path.dirname(path), mode=TOKEN_DIR_MODE, exist_ok=True)
     temporary = path + ".tmp"
-    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, TOKEN_MODE)
-    # O_CREAT ignores its mode on a leftover temporary, so narrow the fd itself.
-    os.fchmod(descriptor, TOKEN_MODE)
+    # Unlink the leftover, then refuse an existing path, so no symlink can redirect it.
+    try:
+        os.unlink(temporary)
+    except FileNotFoundError:
+        pass
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, TOKEN_MODE)
     with os.fdopen(descriptor, "w") as handle:
         json.dump(payload, handle)
     os.replace(temporary, path)

@@ -93,6 +93,20 @@ def leftover_temporary_cannot_widen_a_secret():
         check("leftover temporary cannot widen a secret", mode == 0o600, oct(mode))
 
 
+def a_symlink_cannot_redirect_the_token():
+    """The .tmp path is predictable, so a symlink there used to take the write."""
+    with tempfile.TemporaryDirectory() as directory:
+        target = os.path.join(directory, "token.json")
+        bystander = os.path.join(directory, "bystander")
+        with open(bystander, "w") as handle:
+            handle.write("UNTOUCHED")
+        os.symlink(bystander, target + ".tmp")
+        rpc.write_private(target, {"access_token": "not-a-real-token"})
+        with open(bystander) as handle:
+            kept = handle.read()
+        check("a symlink cannot redirect the token", kept == "UNTOUCHED", kept)
+
+
 def a_bad_command_value_never_raises():
     """float(None) raised TypeError and killed the command channel for good."""
     fake = FakeRpc()
@@ -193,6 +207,7 @@ def a_refusal_is_still_an_rpc_error():
 
 def main():
     for case in (leftover_temporary_cannot_widen_a_secret,
+                 a_symlink_cannot_redirect_the_token,
                  a_bad_command_value_never_raises,
                  a_good_command_value_reaches_discord,
                  as_number_rejects_both_bad_shapes,
