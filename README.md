@@ -177,10 +177,12 @@ Testers** list; the owner is already covered.
 
 ```bash
 omarchy plugin remove io.github.thisisgm.discord
+rm -rf ~/.config/omarchy-discord ~/.local/state/omarchy-discord
 ```
 
-Nothing is left behind outside the plugin folder except the two optional files
-named above and the tray entry you unticked, if you got that far.
+Those two directories are the client secret and the token from voice controls, so
+they go with the plugin rather than outliving it. Nothing else is left behind except
+the tray entry you unticked, if you got that far.
 
 ## Contributing
 
