@@ -368,6 +368,7 @@ Panel {
           }
 
           Text {
+            textFormat: Text.PlainText
             // A bridge nobody set up is not an error, so it stays quiet until credentials exist.
             readonly property string message: discord.lastError !== ""
               ? discord.lastError
@@ -473,6 +474,7 @@ Panel {
                 readonly property real fieldWidth: width - leftPadding - rightPadding
 
                 Text {
+                  textFormat: Text.PlainText
                   width: setupForm.fieldWidth
                   text: "Create an application, add this redirect URI on its OAuth2 page, then paste the Client ID and Secret from that same page."
                   color: root.dim
@@ -483,6 +485,7 @@ Panel {
 
                 // Meant to be read and copied, so it gets the readable size.
                 Text {
+                  textFormat: Text.PlainText
                   width: setupForm.fieldWidth
                   text: root.redirectUri
                   color: root.foreground
@@ -509,6 +512,7 @@ Panel {
                 }
 
                 Text {
+                  textFormat: Text.PlainText
                   visible: root.setupError !== ""
                   width: setupForm.fieldWidth
                   text: root.setupError
@@ -601,6 +605,7 @@ Panel {
     spacing: Style.space(8)
 
     Text {
+      textFormat: Text.PlainText
       text: infoPair.label
       color: root.foreground
       opacity: 0.6
@@ -609,6 +614,7 @@ Panel {
     }
 
     Text {
+      textFormat: Text.PlainText
       Layout.fillWidth: true
       text: infoPair.value
       color: root.foreground
@@ -633,6 +639,7 @@ Panel {
       spacing: Style.space(8)
 
       Text {
+        textFormat: Text.PlainText
         text: Model.pingGlyph(root.pingQuality)
         color: root.pingQuality === "poor" ? root.urgent
           : (root.pingQuality === "good" ? root.foreground : root.dim)
@@ -646,6 +653,7 @@ Panel {
         spacing: Style.space(3)
 
         Text {
+          textFormat: Text.PlainText
           Layout.fillWidth: true
           text: Model.callPlace(discord.callChannel, discord.callGuild)
           color: root.foreground
@@ -655,6 +663,7 @@ Panel {
         }
 
         Text {
+          textFormat: Text.PlainText
           Layout.fillWidth: true
           text: root.callSubtitle
           color: discord.rpc.deaf || discord.micMuted ? root.urgent : root.dim
@@ -750,6 +759,7 @@ Panel {
       spacing: Style.space(8)
 
       Text {
+        textFormat: Text.PlainText
         text: discord.micMuted ? "󰍭" : "󰍬"
         color: discord.micMuted ? root.urgent : root.foreground
         font.family: root.fontFamily
@@ -762,6 +772,7 @@ Panel {
         spacing: Style.space(3)
 
         Text {
+          textFormat: Text.PlainText
           Layout.fillWidth: true
           text: discord.micMuted ? "Microphone muted" : "Microphone live"
           color: root.foreground
@@ -826,6 +837,7 @@ Panel {
       spacing: Style.space(8)
 
       Text {
+        textFormat: Text.PlainText
         text: discord.appMuted ? "󰝟" : "󰕾"
         color: discord.appMuted ? root.urgent : root.foreground
         font.family: root.fontFamily
@@ -844,6 +856,7 @@ Panel {
         spacing: Style.space(3)
 
         Text {
+          textFormat: Text.PlainText
           Layout.fillWidth: true
           text: "Discord volume"
           color: root.foreground
@@ -864,6 +877,7 @@ Panel {
       }
 
       Text {
+        textFormat: Text.PlainText
         text: Math.round(discord.appVolume * 100) + "%"
         color: root.dim
         font.family: root.fontFamily
@@ -898,6 +912,7 @@ Panel {
       spacing: Style.space(8)
 
       Text {
+        textFormat: Text.PlainText
         text: "󰘮"
         color: root.foreground
         font.family: root.fontFamily
@@ -910,6 +925,7 @@ Panel {
         spacing: Style.space(3)
 
         Text {
+          textFormat: Text.PlainText
           Layout.fillWidth: true
           text: "Mic gain"
           color: root.foreground
@@ -930,6 +946,7 @@ Panel {
       }
 
       Text {
+        textFormat: Text.PlainText
         text: discord.rpc.inputVolume + "%"
         color: root.dim
         font.family: root.fontFamily
@@ -971,6 +988,7 @@ Panel {
       spacing: Style.space(8)
 
       Text {
+        textFormat: Text.PlainText
         text: "󰍹"
         color: windowRow.wantsAttention ? root.urgent : root.foreground
         font.family: root.fontFamily
@@ -983,6 +1001,7 @@ Panel {
         spacing: Style.space(1)
 
         Text {
+          textFormat: Text.PlainText
           Layout.fillWidth: true
           text: Model.windowTitle(windowRow.toplevel)
           color: root.foreground
@@ -992,6 +1011,7 @@ Panel {
         }
 
         Text {
+          textFormat: Text.PlainText
           Layout.fillWidth: true
           text: {
             var workspace = Model.workspaceLabel(windowRow.toplevel)
@@ -1042,6 +1062,7 @@ Panel {
       spacing: Style.space(8)
 
       Text {
+        textFormat: Text.PlainText
         text: actionRow.glyph
         color: root.foreground
         font.family: root.fontFamily
@@ -1054,6 +1075,7 @@ Panel {
         spacing: Style.space(1)
 
         Text {
+          textFormat: Text.PlainText
           Layout.fillWidth: true
           text: actionRow.label
           color: root.foreground
@@ -1063,6 +1085,7 @@ Panel {
         }
 
         Text {
+          textFormat: Text.PlainText
           Layout.fillWidth: true
           visible: actionRow.sub !== ""
           text: actionRow.sub
