@@ -10,9 +10,15 @@ description: What changed in this bundle and when
 
 Vesktop measured as a second supported client: `discord-window-identity` gains
 its three slots plus the suffixless title, `discord-pipewire-streams` gains the
-`vesktop` process binary with the live-call question left open, and
-`discord-rpc-access` records that vesktop creates the same local socket without
-claiming the handshake. All measured on a running vesktop 1.6.7-1.
+`vesktop` process binary, and `discord-rpc-access` records that vesktop creates
+the same local socket without claiming the handshake. All measured on a running
+vesktop 1.6.7-1.
+
+Later the same day a live vesktop call settled the stream question:
+`discord-pipewire-streams` records that vesktop publishes no VoiceEngine name,
+that every stream reads `application.name = "vesktop"`, and that the capture
+stream is therefore the call signal, with the app-muted and idle cases left
+open.
 
 ## 2026-08-16, during a live call
 

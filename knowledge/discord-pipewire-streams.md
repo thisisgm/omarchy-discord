@@ -44,11 +44,28 @@ No capture node, which confirms the paragraph above against live state rather
 than a remembered session, and only one playback node, so the two-stream case
 below did not occur.
 
-## One question vesktop adds
+## Vesktop, measured during a live call, 2026-08-20
 
-The binary match above covers vesktop, but whether a vesktop call publishes
-`application.name = "WEBRTC VoiceEngine"` the same way still needs a live
-vesktop call to settle; no call was connected while measuring.
+**Vesktop publishes no `WEBRTC VoiceEngine` name.** Every vesktop stream
+carries `application.process.binary = "vesktop"` and
+`application.name = "vesktop"`, so the discord package's name match finds
+nothing. With a call connected and the microphone open, `pw-dump` reported
+exactly two vesktop nodes:
+
+```
+id=114  Stream/Output/Audio  application.name=vesktop  media.name=Playback       state=running
+id=128  Stream/Input/Audio   application.name=vesktop  media.name=RecordStream  state=running
+```
+
+Only the capture stream is an unambiguous call signal: notification sounds are
+output-only, so `Stream/Input/Audio` owned by vesktop means a call with the
+microphone open. The playback stream cannot carry that meaning, because a
+notification sound publishes the same name.
+
+Two vesktop questions remain, both needing the microphone closed inside
+vesktop or an idle instance to settle: whether vesktop releases the capture
+stream when its own mute is on (the discord package does, see above), and
+whether the playback stream outlives the call.
 
 ## Two questions still open
 

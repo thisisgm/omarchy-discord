@@ -80,9 +80,12 @@ function isOwnedByDiscord(node) {
   return isAppId(nodeProps(node)["application.process.binary"])
 }
 
-// The voice engine holds streams only while in a call; notification sounds do not.
+// The discord package's voice engine holds streams only in a call; notification sounds do not.
+// vesktop names every stream vesktop, so only its capture stream means a call.
 function isVoiceStream(node) {
-  return isOwnedByDiscord(node) && String(nodeProps(node)["application.name"] || "") === "WEBRTC VoiceEngine"
+  if (!isOwnedByDiscord(node)) return false
+  var name = String(nodeProps(node)["application.name"] || "")
+  return name === "WEBRTC VoiceEngine" || (name === "vesktop" && !isPlaybackStream(node))
 }
 
 function hasVoiceStream(nodes) {
