@@ -62,10 +62,14 @@ output-only, so `Stream/Input/Audio` owned by vesktop means a call with the
 microphone open. The playback stream cannot carry that meaning, because a
 notification sound publishes the same name.
 
-Two vesktop questions remain, both needing the microphone closed inside
-vesktop or an idle instance to settle: whether vesktop releases the capture
-stream when its own mute is on (the discord package does, see above), and
-whether the playback stream outlives the call.
+Vesktop keeps that capture stream under its own mute. Sampled twice a second
+for 53 seconds, covering a mute and unmute pressed inside vesktop, the capture
+node never left and never left the running state. The discord package releases
+the capture stream in the same situation, so the clients differ here and the
+call signal survives vesktop's mute button.
+
+One vesktop question remains: whether the playback stream outlives the call,
+which needs an idle instance to settle.
 
 ## Two questions still open
 

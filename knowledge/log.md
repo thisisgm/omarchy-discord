@@ -17,8 +17,11 @@ vesktop 1.6.7-1.
 Later the same day a live vesktop call settled the stream question:
 `discord-pipewire-streams` records that vesktop publishes no VoiceEngine name,
 that every stream reads `application.name = "vesktop"`, and that the capture
-stream is therefore the call signal, with the app-muted and idle cases left
-open.
+stream is therefore the call signal. Sampling through a mute and unmute
+pressed inside vesktop settled the app-muted case too: vesktop keeps the
+capture stream running, unlike the discord package, so the call signal
+survives vesktop's own mute button. Only the idle case is left open, whether
+the playback stream outlives the call.
 
 ## 2026-08-16, during a live call
 

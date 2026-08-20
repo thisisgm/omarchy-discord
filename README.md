@@ -118,9 +118,10 @@ One, in Setup > Plugins: **hide the icon when Discord is not running**.
 - **Mic control needs an open capture stream.** Discord releases the stream
   when it closes the microphone, and there is nothing to mute at the PipeWire
   level until it comes back. The row appears when the stream does.
-- **Vesktop's call dot rides the microphone.** Vesktop publishes no
-  voice-engine name for its streams, so the in-call signal is its capture
-  stream, which exists while the microphone is open.
+- **Vesktop's call dot rides its capture stream.** Vesktop publishes no
+  voice-engine name for its streams, so the capture stream is the call signal.
+  Unlike Discord it keeps that stream under its own mute, so the dot survives
+  muting.
 - **Muting here is not Discord's mute button.** Discord's own UI will still
   show you as unmuted while PipeWire feeds it silence.
 
