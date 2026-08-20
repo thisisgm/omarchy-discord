@@ -68,8 +68,11 @@ node never left and never left the running state. The discord package releases
 the capture stream in the same situation, so the clients differ here and the
 call signal survives vesktop's mute button.
 
-One vesktop question remains: whether the playback stream outlives the call,
-which needs an idle instance to settle.
+And the playback stream does outlive the call: after leaving, `pw-dump` showed
+the same `Stream/Output/Audio` still present and running with the capture node
+gone. The playback stream therefore cannot be the call signal twice over, by
+name and by lifetime, and the panel verified the call state dropping while the
+volume row stayed.
 
 ## Two questions still open
 
