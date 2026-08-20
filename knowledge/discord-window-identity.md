@@ -1,12 +1,14 @@
 ---
 type: reference
-title: How Discord identifies itself to the desktop
-description: Window class, desktop entry and process name for the Arch discord package, and the one launch path that unhides a tray-hidden instance
+title: How Discord clients identify themselves to the desktop
+description: Window class, desktop entry and process name for the Arch discord package and vesktop, and the one launch path that unhides a tray-hidden instance
 tags: [discord, hyprland, wayland]
 status: stable
 verified:
   - by: hyprctl clients and ps on Omarchy 4.0.0, Arch discord app-1.0.154
     at: 2026-08-15
+  - by: hyprctl clients, ps and the vesktop.desktop entry on Omarchy, vesktop 1.6.7-1
+    at: 2026-08-20
 ---
 
 # Window, entry and process identity
@@ -23,8 +25,20 @@ agree:
   `--type=` argument and that one is the main process. Signalling any of the
   others files a crash report inside Discord.
 
-A Flatpak build or a fork publishes different values for all three. Supporting
-those is a real change with a real test rather than a configuration knob.
+Vesktop publishes the same three slots under its own name, all lowercase, and
+all three were measured the same way:
+
+- **Window class is `vesktop`**, with `StartupWMClass=vesktop` in
+  `vesktop.desktop`, and the desktop entry is `vesktop.desktop`.
+- **Process is `vesktop`**, so `ps -C vesktop` finds it and `ps -C` accepts
+  both names as a comma list. A running instance had eight processes, with the
+  one lacking `--type=` as the main process, same shape as the discord package.
+- **Window title carries no ` - Discord` suffix.** The observed title read
+  `(224) Discord | Amigos`, so title trimming must not assume the suffix.
+
+A Flatpak build or another fork publishes different values for all three.
+Supporting those is a real change with a real test rather than a configuration
+knob.
 
 ## Discord runs windowless
 

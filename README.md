@@ -21,7 +21,7 @@ urgent color whenever the call cannot hear you, which is the state above.
 
 | Question | Answered by | How |
 |---|---|---|
-| Is Discord installed? | `DesktopEntries` | the shell's own desktop entry index, matched on `StartupWMClass=discord` |
+| Is Discord installed? | `DesktopEntries` | the shell's own desktop entry index, matched on `StartupWMClass=discord` or `StartupWMClass=vesktop` |
 | Does it want you? | Hyprland | the window's urgency flag, which Discord raises on a mention or a DM |
 | Where is the window? | Hyprland | `toplevels`, with title and workspace |
 | Are you in a call? | PipeWire | Discord's WebRTC voice streams exist only while connected |
@@ -35,9 +35,10 @@ application is involved.
 ## Requirements
 
 - **Omarchy Quattro.** This is built against its shell plugin contract.
-- **Discord from the Arch `discord` package.** Every signal keys off that one
-  shape: window class `discord`, desktop entry `discord.desktop`, and a process
-  called `Discord`. A Flatpak build, a fork, or Discord run as a web app
+- **Discord from the Arch `discord` package, or `vesktop`.** Every signal keys
+  off the client's shape: window class `discord`, desktop entry
+  `discord.desktop` and a process called `Discord`, or the same three slots
+  reading `vesktop`. A Flatpak build, another fork, or Discord run as a web app
   publishes different values and is not supported. Making those work is a real
   change with a real test rather than a configuration knob, so the plugin does
   not pretend otherwise.

@@ -56,6 +56,13 @@ nothing is published to read. Electron would also need
 `--force-renderer-accessibility`, and scraping voice-panel labels would break on
 any Discord redesign.
 
+## Vesktop keeps the socket
+
+Vesktop creates the same `$XDG_RUNTIME_DIR/discord-ipc-0` while running
+(measured 2026-08-20, vesktop 1.6.7-1, no other Discord client installed), so
+the bridge has a socket to reach. The handshake against it was not exercised,
+because that needs a registered application with the `rpc` scope.
+
 ## Running Discord as a web app removes the socket
 
 Omarchy web apps are `chromium --app=URL`, which never creates the RPC socket.

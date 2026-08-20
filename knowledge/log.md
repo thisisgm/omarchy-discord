@@ -6,6 +6,14 @@ description: What changed in this bundle and when
 
 # Log
 
+## 2026-08-20
+
+Vesktop measured as a second supported client: `discord-window-identity` gains
+its three slots plus the suffixless title, `discord-pipewire-streams` gains the
+`vesktop` process binary with the live-call question left open, and
+`discord-rpc-access` records that vesktop creates the same local socket without
+claiming the handshake. All measured on a running vesktop 1.6.7-1.
+
 ## 2026-08-16, during a live call
 
 `discord-pipewire-streams` gained a measurement rather than a recollection: one

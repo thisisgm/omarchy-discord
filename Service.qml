@@ -95,10 +95,13 @@ Item {
     mainPid = parsed.mainPid
   }
 
-  // The launcher's own path, so Discord lands in app-graphical.slice, not the compositor's.
+  // The launcher's own path, so the client lands in app-graphical.slice, not the compositor's.
   function launch() {
     if (!installed) return
-    Util.execDetached("uwsm-app -- gtk-launch discord.desktop")
+    // The matched entry's StartupWMClass is its desktop file's basename.
+    var entry = Model.findEntry(applications)
+    var desktop = entry && entry.startupClass ? String(entry.startupClass) + ".desktop" : "discord.desktop"
+    Util.execDetached("uwsm-app -- gtk-launch " + desktop)
     settle()
   }
 
@@ -164,7 +167,7 @@ Item {
   Process {
     id: statusProcess
     running: false
-    command: ["ps", "-C", "Discord", "-o", "pid=,rss=,args="]
+    command: ["ps", "-C", "Discord,vesktop", "-o", "pid=,rss=,args="]
 
     stdout: StdioCollector {
       id: statusStdout

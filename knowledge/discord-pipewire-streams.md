@@ -1,7 +1,7 @@
 ---
 type: reference
-title: How Discord appears in PipeWire
-description: Discord's streams publish as WEBRTC VoiceEngine, so only the process binary identifies them, and no capture stream exists while the microphone is closed
+title: How Discord clients appear in PipeWire
+description: Streams publish as WEBRTC VoiceEngine, so only the process binary identifies them, and no capture stream exists while the microphone is closed
 tags: [discord, pipewire, audio]
 status: stable
 verified:
@@ -13,8 +13,9 @@ verified:
 
 **PipeWire does not name the app "Discord".** Call streams publish as
 `application.name = "WEBRTC VoiceEngine"`, and `media.name` is `playStream`.
-Only `application.process.binary = "Discord"` identifies the owner, so any match
-on the friendly name finds nothing.
+Only `application.process.binary` identifies the owner: `Discord` for the
+discord package, `vesktop` for vesktop (measured with `pw-dump` on an idle
+vesktop 1.6.7-1, 2026-08-20), so any match on the friendly name finds nothing.
 
 The voice engine holds streams only while connected to a call, which makes
 "is in a call" answerable without touching Discord's own state: the WebRTC
@@ -42,6 +43,12 @@ id=71  Stream/Output/Audio  application.name=WEBRTC VoiceEngine  media.name=play
 No capture node, which confirms the paragraph above against live state rather
 than a remembered session, and only one playback node, so the two-stream case
 below did not occur.
+
+## One question vesktop adds
+
+The binary match above covers vesktop, but whether a vesktop call publishes
+`application.name = "WEBRTC VoiceEngine"` the same way still needs a live
+vesktop call to settle; no call was connected while measuring.
 
 ## Two questions still open
 
