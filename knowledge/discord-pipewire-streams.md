@@ -1,7 +1,7 @@
 ---
 type: reference
-title: How Discord appears in PipeWire
-description: Discord's streams publish as WEBRTC VoiceEngine, so only the process binary identifies them, and no capture stream exists while the microphone is closed
+title: How Discord clients appear in PipeWire
+description: Streams publish as WEBRTC VoiceEngine, so only the process binary identifies them, and no capture stream exists while the microphone is closed
 tags: [discord, pipewire, audio]
 status: stable
 verified:
@@ -13,8 +13,9 @@ verified:
 
 **PipeWire does not name the app "Discord".** Call streams publish as
 `application.name = "WEBRTC VoiceEngine"`, and `media.name` is `playStream`.
-Only `application.process.binary = "Discord"` identifies the owner, so any match
-on the friendly name finds nothing.
+Only `application.process.binary` identifies the owner: `Discord` for the
+discord package, `vesktop` for vesktop (measured with `pw-dump` on an idle
+vesktop 1.6.7-1, 2026-08-20), so any match on the friendly name finds nothing.
 
 The voice engine holds streams only while connected to a call, which makes
 "is in a call" answerable without touching Discord's own state: the WebRTC
@@ -42,6 +43,36 @@ id=71  Stream/Output/Audio  application.name=WEBRTC VoiceEngine  media.name=play
 No capture node, which confirms the paragraph above against live state rather
 than a remembered session, and only one playback node, so the two-stream case
 below did not occur.
+
+## Vesktop, measured during a live call, 2026-08-20
+
+**Vesktop publishes no `WEBRTC VoiceEngine` name.** Every vesktop stream
+carries `application.process.binary = "vesktop"` and
+`application.name = "vesktop"`, so the discord package's name match finds
+nothing. With a call connected and the microphone open, `pw-dump` reported
+exactly two vesktop nodes:
+
+```text
+id=114  Stream/Output/Audio  application.name=vesktop  media.name=Playback       state=running
+id=128  Stream/Input/Audio   application.name=vesktop  media.name=RecordStream  state=running
+```
+
+Only the capture stream is an unambiguous call signal: notification sounds are
+output-only, so `Stream/Input/Audio` owned by vesktop means a call with the
+microphone open. The playback stream cannot carry that meaning, because a
+notification sound publishes the same name.
+
+Vesktop keeps that capture stream under its own mute. Sampled twice a second
+for 53 seconds, covering a mute and unmute pressed inside vesktop, the capture
+node never left and never left the running state. The discord package releases
+the capture stream in the same situation, so the clients differ here and the
+call signal survives vesktop's mute button.
+
+And the playback stream does outlive the call: after leaving, `pw-dump` showed
+the same `Stream/Output/Audio` still present and running with the capture node
+gone. The playback stream therefore cannot be the call signal twice over, by
+name and by lifetime, and the panel verified the call state dropping while the
+volume row stayed.
 
 ## Two questions still open
 

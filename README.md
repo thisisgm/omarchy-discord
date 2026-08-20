@@ -21,7 +21,7 @@ urgent color whenever the call cannot hear you, which is the state above.
 
 | Question | Answered by | How |
 |---|---|---|
-| Is Discord installed? | `DesktopEntries` | the shell's own desktop entry index, matched on `StartupWMClass=discord` |
+| Is a supported client installed? | `DesktopEntries` | the shell's own desktop entry index, matched on `StartupWMClass=discord` or `StartupWMClass=vesktop` |
 | Does it want you? | Hyprland | the window's urgency flag, which Discord raises on a mention or a DM |
 | Where is the window? | Hyprland | `toplevels`, with title and workspace |
 | Are you in a call? | PipeWire | Discord's WebRTC voice streams exist only while connected |
@@ -35,9 +35,10 @@ application is involved.
 ## Requirements
 
 - **Omarchy Quattro.** This is built against its shell plugin contract.
-- **Discord from the Arch `discord` package.** Every signal keys off that one
-  shape: window class `discord`, desktop entry `discord.desktop`, and a process
-  called `Discord`. A Flatpak build, a fork, or Discord run as a web app
+- **Discord from the Arch `discord` package, or `vesktop`.** Every signal keys
+  off the client's shape: window class `discord`, desktop entry
+  `discord.desktop` and a process called `Discord`, or the same three slots
+  reading `vesktop`. A Flatpak build, another fork, or Discord run as a web app
   publishes different values and is not supported. Making those work is a real
   change with a real test rather than a configuration knob, so the plugin does
   not pretend otherwise.
@@ -117,6 +118,10 @@ One, in Setup > Plugins: **hide the icon when Discord is not running**.
 - **Mic control needs an open capture stream.** Discord releases the stream
   when it closes the microphone, and there is nothing to mute at the PipeWire
   level until it comes back. The row appears when the stream does.
+- **Vesktop's call dot rides its capture stream.** Vesktop publishes no
+  voice-engine name for its streams, so the capture stream is the call signal.
+  Unlike Discord it keeps that stream under its own mute, so the dot survives
+  muting.
 - **Muting here is not Discord's mute button.** Discord's own UI will still
   show you as unmuted while PipeWire feeds it silence.
 

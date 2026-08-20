@@ -2,6 +2,12 @@
 
 var KIB_PER_MIB = 1024
 var MIB_PER_GIB = 1024
+// The two supported clients: the discord package publishes discord/Discord, vesktop vesktop.
+var APP_IDS = ["discord", "vesktop"]
+
+function isAppId(value) {
+  return APP_IDS.indexOf(String(value || "").toLowerCase()) !== -1
+}
 
 // ---------------------------------------------------------------- desktop
 
@@ -10,7 +16,7 @@ function findEntry(applications) {
   var list = applications || []
   for (var i = 0; i < list.length; i++) {
     var entry = list[i]
-    if (entry && String(entry.startupClass || "").toLowerCase() === "discord") return entry
+    if (entry && isAppId(entry.startupClass)) return entry
   }
   return null
 }
@@ -26,12 +32,12 @@ function toplevelClass(toplevel) {
   return ipc ? String(ipc["class"] || ipc["initialClass"] || "") : ""
 }
 
-// hyprctl reports both class and initialClass as exactly "discord" here.
+// hyprctl reports class and initialClass as the client's own app id here.
 function matchWindows(toplevels) {
   var list = toplevels || []
   var out = []
   for (var i = 0; i < list.length; i++) {
-    if (String(toplevelClass(list[i])).toLowerCase() === "discord") out.push(list[i])
+    if (isAppId(toplevelClass(list[i]))) out.push(list[i])
   }
   return out
 }
@@ -71,12 +77,15 @@ function streamNodes(nodes) {
 
 // Streams say "WEBRTC VoiceEngine", so the process binary alone names the app.
 function isOwnedByDiscord(node) {
-  return String(nodeProps(node)["application.process.binary"] || "") === "Discord"
+  return isAppId(nodeProps(node)["application.process.binary"])
 }
 
-// The voice engine holds streams only while in a call; notification sounds do not.
+// The discord package's voice engine holds streams only in a call; notification sounds do not.
+// vesktop names every stream vesktop, so only its capture stream means a call.
 function isVoiceStream(node) {
-  return isOwnedByDiscord(node) && String(nodeProps(node)["application.name"] || "") === "WEBRTC VoiceEngine"
+  if (!isOwnedByDiscord(node)) return false
+  var name = String(nodeProps(node)["application.name"] || "")
+  return name === "WEBRTC VoiceEngine" || (name === "vesktop" && !isPlaybackStream(node))
 }
 
 function hasVoiceStream(nodes) {
@@ -107,7 +116,8 @@ function findDiscordStream(nodes, playback) {
 
 // ---------------------------------------------------------------- process
 
-// lines look like "239958 272772 /home/gm/.config/discord/app-1.0.154/Discord --type=renderer"
+// discord: "239958 272772 /home/gm/.config/discord/app-1.0.154/Discord --type=renderer"
+// vesktop: "248461 384348 /usr/lib/vesktop/vesktop"
 // The main process is the one with no --type=; signalling a child files a crash report.
 function parseProcesses(raw) {
   var lines = String(raw || "").split("\n")
