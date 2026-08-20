@@ -21,7 +21,7 @@ urgent color whenever the call cannot hear you, which is the state above.
 
 | Question | Answered by | How |
 |---|---|---|
-| Is Discord installed? | `DesktopEntries` | the shell's own desktop entry index, matched on `StartupWMClass=discord` or `StartupWMClass=vesktop` |
+| Is a supported client installed? | `DesktopEntries` | the shell's own desktop entry index, matched on `StartupWMClass=discord` or `StartupWMClass=vesktop` |
 | Does it want you? | Hyprland | the window's urgency flag, which Discord raises on a mention or a DM |
 | Where is the window? | Hyprland | `toplevels`, with title and workspace |
 | Are you in a call? | PipeWire | Discord's WebRTC voice streams exist only while connected |

@@ -100,7 +100,7 @@ Item {
     if (!installed) return
     // The matched entry's StartupWMClass is its desktop file's basename.
     var entry = Model.findEntry(applications)
-    var desktop = entry && entry.startupClass ? String(entry.startupClass) + ".desktop" : "discord.desktop"
+    var desktop = entry && entry.startupClass ? String(entry.startupClass).toLowerCase() + ".desktop" : "discord.desktop"
     Util.execDetached("uwsm-app -- gtk-launch " + desktop)
     settle()
   }

@@ -52,7 +52,7 @@ carries `application.process.binary = "vesktop"` and
 nothing. With a call connected and the microphone open, `pw-dump` reported
 exactly two vesktop nodes:
 
-```
+```text
 id=114  Stream/Output/Audio  application.name=vesktop  media.name=Playback       state=running
 id=128  Stream/Input/Audio   application.name=vesktop  media.name=RecordStream  state=running
 ```

@@ -33,7 +33,7 @@ all three were measured the same way:
 - **Process is `vesktop`**, so `ps -C vesktop` finds it and `ps -C` accepts
   both names as a comma list. A running instance had eight processes, with the
   one lacking `--type=` as the main process, same shape as the discord package.
-- **Window title carries no ` - Discord` suffix.** The observed title read
+- **Window title does not require a `- Discord` suffix.** The observed title read
   `(224) Discord | Amigos`, so title trimming must not assume the suffix.
 
 A Flatpak build or another fork publishes different values for all three.
