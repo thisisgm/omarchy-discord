@@ -16,10 +16,17 @@ Panel {
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color urgent: bar ? bar.urgent : Color.urgent
+  readonly property color accent: bar && bar.accent ? bar.accent : Color.accent
   readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
 
   readonly property bool hideWhenStopped: setting("hideWhenStopped", false) === true
+  property bool showMicHud: setting("showMicHud", true) === true
+
+  function toggleMicHud() {
+    showMicHud = !showMicHud
+    Util.execDetached("python3 -c 'import json, os; p=os.path.expanduser(\"~/.config/omarchy/shell.json\"); data=json.load(open(p)); [w.update({\"showMicHud\": " + (showMicHud ? "True" : "False") + "}) for s in data.get(\"bar\",{}).get(\"layout\",{}).values() for w in s if w.get(\"id\") == \"io.github.thisisgm.discord\"]; json.dump(data, open(p, \"w\"), indent=2)'")
+  }
   readonly property real volumeStep: 0.05
   // Discord's own input volume is a 0-100 percentage, not a PipeWire ratio.
   readonly property int gainStep: 5
@@ -60,13 +67,14 @@ Panel {
   }
 
   readonly property string callSubtitle: {
-    if (discord.rpc.deaf) return "Deafened"
-    if (discord.micMuted) return "Muted"
-    if (pingQuality === "poor" || pingQuality === "fair") return "Unstable · " + discord.rpc.ping + " ms"
+    var prefix = discord.sharingScreen ? "Sharing screen · " : ""
+    if (discord.rpc.deaf) return prefix + "Deafened"
+    if (discord.micMuted) return prefix + "Muted"
+    if (pingQuality === "poor" || pingQuality === "fair") return prefix + "Unstable · " + discord.rpc.ping + " ms"
     var talking = discord.rpc.speaking
-    if (talking.length === 1) return talking[0] + " is talking"
-    if (talking.length > 1) return talking.join(", ") + " are talking"
-    return "Connected"
+    if (talking.length === 1) return prefix + talking[0] + " is talking"
+    if (talking.length > 1) return prefix + talking.join(", ") + " are talking"
+    return discord.sharingScreen ? "Sharing screen" : "Connected"
   }
   // The meter reads low at speech level, so scale it up to fill the bar.
   readonly property real peakScale: 1.6
@@ -84,9 +92,11 @@ Panel {
     if (discord.installed) list.push({ kind: "power" })
     if (callControls || micRowVisible) list.push({ kind: "mic" })
     if (callControls) list.push({ kind: "deafen" })
+    if (discord.sharingScreen) list.push({ kind: "stopShare" })
     if (callControls) list.push({ kind: "hangup" })
     if (callControls) list.push({ kind: "gain" })
     if (discord.hasPlayback) list.push({ kind: "volume" })
+    if (discord.inVoice) list.push({ kind: "hud" })
     if (setupVisible && !setupOpen) list.push({ kind: "setup" })
     for (var i = 0; i < discord.windows.length; i++) list.push({ kind: "window", windowIndex: i })
     // The window rows already focus Discord, so this row is only for when there is none.
@@ -132,8 +142,10 @@ Panel {
     case "power": discord.running ? discord.quit() : discord.launch(); break
     case "mic": discord.toggleMic(); break
     case "deafen": discord.toggleDeaf(); break
+    case "stopShare": discord.stopScreenShare(); root.close(); break
     case "hangup": discord.hangUp(); break
     case "volume": discord.toggleAppMute(); break
+    case "hud": root.toggleMicHud(); break
     case "window": discord.focusWindow(discord.windows[currentRow.windowIndex]); root.close(); break
     case "open": if (discord.installed) { discord.open(); root.close() } break
     case "setup": root.openSetup(); break
@@ -163,7 +175,19 @@ Panel {
   PwNodePeakMonitor {
     id: micPeak
     node: discord.captureNode
-    enabled: root.opened && discord.captureNode !== null
+    enabled: (root.opened || (root.showMicHud && discord.inVoice && discord.micLive)) && discord.captureNode !== null
+  }
+
+  MicHud {
+    id: micHud
+    active: root.showMicHud && discord.inVoice && (discord.micLive || discord.sharingScreen)
+    inVoice: discord.inVoice
+    micLive: discord.micLive
+    sharingScreen: discord.sharingScreen
+    channel: discord.callChannel
+    audioPeak: micPeak.peak
+    onToggleMicRequested: discord.toggleMic()
+    onStopShareRequested: discord.stopScreenShare()
   }
 
   // raise and mute are the two worth binding a key to.
@@ -195,6 +219,19 @@ Panel {
       if (!discord.voiceKnown) return "no voice bridge"
       discord.hangUp()
       return "ok"
+    }
+    function hudStatus(): string {
+      return JSON.stringify({
+        showMicHud: root.showMicHud,
+        inVoice: discord.inVoice,
+        micLive: discord.micLive,
+        micMuted: discord.micMuted,
+        sharingScreen: discord.sharingScreen,
+        channel: discord.callChannel,
+        hudActive: micHud.active,
+        hudPresence: micHud.presence,
+        hudVisible: micHud.visible
+      })
     }
   }
 
@@ -256,7 +293,28 @@ Panel {
             width: Style.space(4)
             height: width
             radius: width / 2
-            color: discord.micLive ? root.barForeground : root.urgent
+            color: discord.micLive ? root.barForeground : "#e06c75"
+          }
+        }
+
+        // Screenshare indicator: screen badge at top-right
+        Rectangle {
+          visible: discord.sharingScreen
+          width: Style.space(7)
+          height: Style.space(6)
+          radius: Style.space(2)
+          color: root.bar ? root.bar.background : Color.background
+          anchors.right: barIcon.right
+          anchors.top: barIcon.top
+          anchors.rightMargin: -Style.space(3)
+          anchors.topMargin: -Style.space(2)
+
+          Rectangle {
+            anchors.centerIn: parent
+            width: Style.space(5)
+            height: Style.space(4)
+            radius: Style.space(1)
+            color: "#3b82f6"
           }
         }
       }
@@ -299,6 +357,7 @@ Panel {
         if (t === "o" || t === "O") { discord.open(); root.close() }
         else if (t === "m" || t === "M") discord.toggleMic()
         else if (t === "d" || t === "D") discord.toggleDeaf()
+        else if (t === "s" || t === "S") { discord.stopScreenShare(); root.close() }
         else if (t === "r" || t === "R") discord.refresh()
       }
 
@@ -429,6 +488,11 @@ Panel {
 
               VolumeRow {
                 visible: discord.hasPlayback
+                width: parent.width
+              }
+
+              HudRow {
+                visible: discord.inVoice
                 width: parent.width
               }
             }
@@ -711,6 +775,19 @@ Panel {
       }
 
       CallButton {
+        visible: discord.sharingScreen
+        kind: "stopShare"
+        iconText: "󰍹"
+        tooltipText: "Stop screen share (Focus Discord)"
+        foreground: root.urgent
+        hoverColor: root.urgent
+        onClicked: {
+          discord.stopScreenShare()
+          root.close()
+        }
+      }
+
+      CallButton {
         kind: "hangup"
         iconText: "󰏵"
         tooltipText: "Leave call"
@@ -807,6 +884,71 @@ Panel {
         hasCursor: micRow.hasCursor
         onToggled: discord.toggleMic()
         onHovered: function (on) { if (on) root.setCursor(micRow.navIndex) }
+        Layout.alignment: Qt.AlignVCenter
+      }
+    }
+  }
+
+  component HudRow: CursorSurface {
+    id: hudRow
+    readonly property int navIndex: root.indexOfRow("hud", -1)
+
+    hasCursor: root.cursorActive && root.rowIndex === navIndex
+    foreground: root.foreground
+    implicitHeight: hudContent.implicitHeight + Style.spacing.rowPaddingX
+
+    MouseArea {
+      anchors.fill: parent
+      hoverEnabled: true
+      acceptedButtons: Qt.NoButton
+      onEntered: root.setCursor(hudRow.navIndex)
+    }
+
+    RowLayout {
+      id: hudContent
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.leftMargin: Style.space(10)
+      anchors.rightMargin: Style.space(10)
+      spacing: Style.space(8)
+
+      Text {
+        textFormat: Text.PlainText
+        text: "󰍬"
+        color: root.showMicHud ? (bar ? bar.accent : Color.accent) : root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.icon
+        Layout.alignment: Qt.AlignVCenter
+      }
+
+      ColumnLayout {
+        Layout.fillWidth: true
+        spacing: Style.space(2)
+
+        Text {
+          textFormat: Text.PlainText
+          text: "On-screen mic indicator"
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+        }
+
+        Text {
+          textFormat: Text.PlainText
+          text: "Animated HUD at screen bottom"
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+        }
+      }
+
+      ToggleSwitch {
+        checked: root.showMicHud
+        foreground: root.foreground
+        hasCursor: hudRow.hasCursor
+        onToggled: root.toggleMicHud()
+        onHovered: function (on) { if (on) root.setCursor(hudRow.navIndex) }
         Layout.alignment: Qt.AlignVCenter
       }
     }

@@ -19,7 +19,8 @@
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
-      "hideWhenStopped": false
+      "hideWhenStopped": false,
+      "showMicHud": true
     },
     "schema": [
       {
@@ -27,6 +28,12 @@
         "type": "boolean",
         "label": "Hide the icon when Discord is not running",
         "defaultValue": false
+      },
+      {
+        "key": "showMicHud",
+        "type": "boolean",
+        "label": "Show animated mic HUD at the bottom of the screen when unmuted",
+        "defaultValue": true
       }
     ]
   }

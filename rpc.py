@@ -329,8 +329,9 @@ def valid_token(client_id, client_secret):
 
 
 class Bridge:
-    def __init__(self, rpc):
+    def __init__(self, rpc, user_id=""):
         self.rpc = rpc
+        self.user_id = str(user_id or "")
         self.subscribed_channel = None
         self.members = {}
         self.speaking = set()
@@ -338,8 +339,7 @@ class Bridge:
         self.state = {"ok": True, "channel": "", "guild": "", "mute": False,
                       "deaf": False, "inputVolume": 100,
                       "speaking": [], "error": "",
-                      "ping": 0, "voiceState": ""}
-
+                      "ping": 0, "voiceState": "", "selfStream": False}
     def emit(self):
         self.state["speaking"] = sorted(
             self.members.get(user_id, user_id) for user_id in self.speaking)
@@ -368,27 +368,35 @@ class Bridge:
         if not channel_id:
             self.state["channel"] = ""
             self.state["guild"] = ""
+            self.state["selfStream"] = False
             self.resubscribe(None)
             return
         channel = self.rpc.request("GET_CHANNEL", {"channel_id": channel_id})
         self.state["channel"] = channel.get("name", "")
         self.state["guild"] = self.guild_name(channel.get("guild_id"))
+        self.state["selfStream"] = False
         # voice_states already names everyone sitting in the call
         for entry in channel.get("voice_states") or []:
             user = entry.get("user") or {}
-            if user.get("id"):
-                self.members[user["id"]] = entry.get("nick") or user.get("username") or user["id"]
+            uid = user.get("id")
+            if uid:
+                self.members[uid] = entry.get("nick") or user.get("username") or uid
+                if self.user_id and uid == self.user_id:
+                    self.state["selfStream"] = bool((entry.get("voice_state") or {}).get("self_stream"))
         self.resubscribe(channel_id)
 
     def resubscribe(self, channel_id):
-        for event in ("SPEAKING_START", "SPEAKING_STOP"):
+        for event in ("SPEAKING_START", "SPEAKING_STOP", "VOICE_STATE_UPDATE"):
             if self.subscribed_channel:
                 try:
                     self.rpc.unsubscribe(event, {"channel_id": self.subscribed_channel})
                 except RpcError:
                     pass
             if channel_id:
-                self.rpc.subscribe(event, {"channel_id": channel_id})
+                try:
+                    self.rpc.subscribe(event, {"channel_id": channel_id})
+                except RpcError:
+                    pass
         self.subscribed_channel = channel_id
 
     # {"state": "VOICE_CONNECTED", "average_ping": 36, "last_ping": 35, ...}
@@ -409,6 +417,14 @@ class Bridge:
             self.apply_voice_settings(data)
         elif event == "VOICE_CHANNEL_SELECT":
             self.select_channel(data.get("channel_id"))
+        elif event == "VOICE_STATE_UPDATE":
+            user_id = data.get("user_id") or (data.get("user") or {}).get("id")
+            if self.user_id and user_id == self.user_id:
+                new_stream = bool((data.get("voice_state") or data).get("self_stream"))
+                if new_stream != self.state.get("selfStream"):
+                    self.state["selfStream"] = new_stream
+                    return True
+            return False
         elif event == "SPEAKING_START":
             self.speaking.add(data.get("user_id"))
         elif event == "SPEAKING_STOP":
@@ -507,10 +523,11 @@ def session():
     client_id, client_secret = credentials()
     rpc = Rpc(connect_socket())
     try:
-        handshake(rpc, client_id)
+        ready = handshake(rpc, client_id)
+        user_id = (ready.get("user") or {}).get("id") or ""
         token = valid_token(client_id, client_secret) or authorize(rpc, client_id, client_secret)
         rpc.request("AUTHENTICATE", {"access_token": token["access_token"]})
-        Bridge(rpc).run()
+        Bridge(rpc, user_id=user_id).run()
     finally:
         rpc.close()
 

@@ -6,6 +6,15 @@ description: What changed in this bundle and when
 
 # Log
 
+## 2026-09-15, during live screenshare
+
+`discord-screenshare-streams` added after live measurements on Omarchy 4.0.3
+with Discord app-1.0.158: PipeWire native video streams publish `node.name`
+and `media.name` instead of `application.process.binary`, and Quickshell
+exposes `isStream = false` on video nodes. Also records that Omarchy Hyprland
+window focus dispatches require `hl.dsp.focus({ window = "address:0x..." })`
+with a `0x` hex address prefix.
+
 ## 2026-08-20
 
 Vesktop measured as a second supported client: `discord-window-identity` gains

@@ -34,6 +34,9 @@ class FakeRpc:
     def subscribe(self, event, args=None):
         return "0"
 
+    def unsubscribe(self, event, args=None):
+        return "0"
+
     def command(self, cmd, args=None, evt=None):
         self.commands.append((cmd, args))
         return "0"
@@ -205,6 +208,24 @@ def a_refusal_is_still_an_rpc_error():
           issubclass(rpc.RpcRejected, rpc.RpcError))
 
 
+def self_stream_is_tracked_for_the_authenticated_user():
+    bridge = rpc.Bridge(FakeRpc(), user_id="12345")
+    check("selfStream defaults to False", bridge.state.get("selfStream") is False)
+
+    # Event for different user does not change state
+    changed = bridge.handle_event("VOICE_STATE_UPDATE", {"user_id": "99999", "voice_state": {"self_stream": True}})
+    check("ignores other users self_stream", not changed and bridge.state.get("selfStream") is False)
+
+    # Event for our user updates state
+    changed = bridge.handle_event("VOICE_STATE_UPDATE", {"user_id": "12345", "voice_state": {"self_stream": True}})
+    check("tracks self_stream for current user", changed and bridge.state.get("selfStream") is True)
+
+    # Event turning off self_stream
+    changed = bridge.handle_event("VOICE_STATE_UPDATE", {"user_id": "12345", "voice_state": {"self_stream": False}})
+    check("tracks self_stream stop", changed and bridge.state.get("selfStream") is False)
+
+
+
 def main():
     for case in (leftover_temporary_cannot_widen_a_secret,
                  a_symlink_cannot_redirect_the_token,
@@ -218,6 +239,7 @@ def main():
                  a_refusal_warning_clips_the_command,
                  a_refusal_is_still_an_rpc_error):
         case()
+    self_stream_is_tracked_for_the_authenticated_user()
     print("\n%d failed" % len(FAILURES) if FAILURES else "\nall passed")
     return 1 if FAILURES else 0
 

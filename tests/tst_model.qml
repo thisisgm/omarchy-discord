@@ -107,4 +107,24 @@ TestCase {
     unbound.ready = false
     verify(!Model.isVoiceStream(unbound))
   }
+
+  function test_isVideoStream_accepts_discord_video_stream() {
+    var vNode = node("Discord", "WEBRTC VoiceEngine", { audio: false })
+    vNode.properties["media.class"] = "Stream/Input/Video"
+    verify(Model.isVideoStream(vNode))
+
+    var screencastNode = node("vesktop", "vesktop", { audio: false })
+    screencastNode.properties["media.name"] = "portal-screencast"
+    verify(Model.isVideoStream(screencastNode))
+  }
+
+  function test_isVideoStream_rejects_audio_and_foreign_streams() {
+    var aNode = node("Discord", "WEBRTC VoiceEngine", {})
+    aNode.properties["media.class"] = "Stream/Input/Audio"
+    verify(!Model.isVideoStream(aNode))
+
+    var foreignVideo = node("obs", "obs", { audio: false })
+    foreignVideo.properties["media.class"] = "Stream/Input/Video"
+    verify(!Model.isVideoStream(foreignVideo))
+  }
 }
