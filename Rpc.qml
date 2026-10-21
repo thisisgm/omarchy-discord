@@ -33,6 +33,7 @@ Item {
   property var speaking: []
   property int ping: 0
   property string voiceState: ""
+  property bool selfStream: false
 
   // Not error === "": rpc.py warns on stderr about refusals it survives, and a warning is not a disconnect.
   readonly property bool connected: ready
@@ -46,6 +47,7 @@ Item {
     speaking = []
     ping = 0
     voiceState = ""
+    selfStream = false
   }
 
   // Setup happens while the shell runs, so opening the panel re-checks.
@@ -92,6 +94,7 @@ Item {
     root.speaking = state.speaking instanceof Array ? state.speaking : []
     root.ping = Math.round(Number(state.ping) || 0)
     root.voiceState = String(state.voiceState || "")
+    root.selfStream = state.selfStream === true
     root.ready = true
     root.restarts = 0
   }

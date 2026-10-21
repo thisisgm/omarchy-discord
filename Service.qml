@@ -54,6 +54,9 @@ Item {
   readonly property var streamNodes: Model.streamNodes(nodes)
   readonly property var captureNode: Model.findDiscordStream(streamNodes, false)
   readonly property var playbackNode: Model.findDiscordStream(streamNodes, true)
+  readonly property var videoStreams: Model.findDiscordVideoStreams(streamNodes)
+  readonly property bool hasVideo: videoStreams.length > 0
+  readonly property bool sharingScreen: hasVideo || (bridge.connected && bridge.selfStream)
 
   // The voice engine holds streams only in a call; the bridge names the call outright.
   readonly property bool inVoice: bridge.inVoice || Model.hasVoiceStream(streamNodes)
@@ -78,6 +81,12 @@ Item {
   readonly property bool micLive: hasMicControl && !micMuted
   readonly property real appVolume: playbackNode && playbackNode.audio ? playbackNode.audio.volume : 0
   readonly property bool appMuted: playbackNode && playbackNode.audio ? playbackNode.audio.muted : false
+
+  onMicMutedChanged: {
+    if (!micMuted && captureNode && captureNode.audio && captureNode.audio.muted) {
+      captureNode.audio.muted = false
+    }
+  }
 
   readonly property string statusText: Model.statusPhrase(root)
 
@@ -112,9 +121,13 @@ Item {
 
   function focusWindow(toplevel) {
     var target = toplevel || primaryWindow
-    if (!target || !target.address) return
-    // focuswindow follows the window to its workspace.
-    Hyprland.dispatch("focuswindow address:" + target.address)
+    var addr = target && target.address ? String(target.address) : ""
+    if (addr !== "") {
+      if (addr.indexOf("0x") !== 0) addr = "0x" + addr
+      Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.focus({ window = \"address:" + addr + "\" })"])
+    } else {
+      Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.focus({ window = \"class:discord\" })"])
+    }
   }
 
   // Electron hands a re-launch to the running process, which unhides a tray-hidden instance.
@@ -137,7 +150,11 @@ Item {
   // Discord's own mute survives the mic closing and shows in its UI; PipeWire's does neither.
   function toggleMic() {
     if (voiceKnown) {
-      bridge.setMute(!bridge.mute)
+      var nextMute = !bridge.mute
+      bridge.setMute(nextMute)
+      if (!nextMute && captureNode && captureNode.audio) {
+        captureNode.audio.muted = false
+      }
       return
     }
     if (captureNode && captureNode.audio) captureNode.audio.muted = !captureNode.audio.muted
@@ -149,6 +166,10 @@ Item {
 
   function hangUp() {
     if (voiceKnown) bridge.hangUp()
+  }
+  function stopScreenShare() {
+    open()
+    settle()
   }
 
   function setMicGain(value) {

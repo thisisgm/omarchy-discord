@@ -77,20 +77,32 @@ function nodeProps(node) {
   return node && node.ready && node.properties ? node.properties : {}
 }
 
+function isVideoNode(node) {
+  if (!node) return false
+  var props = nodeProps(node)
+  var mediaClass = String(props["media.class"] || "").toLowerCase()
+  var mediaType = String(props["media.type"] || "").toLowerCase()
+  return mediaClass.indexOf("video") !== -1 || mediaType === "video"
+}
+
 function streamNodes(nodes) {
   var list = nodes || []
   var out = []
   for (var i = 0; i < list.length; i++) {
-    if (list[i] && list[i].isStream) out.push(list[i])
+    var n = list[i]
+    if (!n) continue
+    if (n.isStream || isAppId(n.name)) out.push(n)
   }
   return out
 }
 
-// Streams say "WEBRTC VoiceEngine", so the process binary alone names the app.
+// Streams say "WEBRTC VoiceEngine" or process binary, native video streams use node.name or media.name.
 function isOwnedByDiscord(node) {
-  return isAppId(nodeProps(node)["application.process.binary"])
+  var props = nodeProps(node)
+  return isAppId(props["application.process.binary"]) ||
+         isAppId(props["node.name"]) ||
+         isAppId(props["media.name"])
 }
-
 // vesktop names every stream vesktop, so a call is only its audio capture stream, never video or playback.
 // Discord publishes five nodes in a call and only one is the mic, so the name alone is not enough.
 function isVoiceStream(node) {
@@ -124,6 +136,30 @@ function findDiscordStream(nodes, playback) {
   }
   return null
 }
+function isVideoStream(node) {
+  if (!node || !node.ready) return false
+  if (!isOwnedByDiscord(node)) return false
+  if (isPlaybackStream(node)) return false
+  var props = nodeProps(node)
+  var mediaClass = String(props["media.class"] || "").toLowerCase()
+  var mediaType = String(props["media.type"] || "").toLowerCase()
+  var mediaRole = String(props["media.role"] || "").toLowerCase()
+  var mediaName = String(props["media.name"] || "").toLowerCase()
+  if (mediaClass.indexOf("video") !== -1 || mediaType === "video") return true
+  if (mediaRole === "screen" || mediaRole === "screencast" || mediaName.indexOf("screencast") !== -1) return true
+  return false
+}
+
+function findDiscordVideoStreams(nodes) {
+  var list = nodes || []
+  var out = []
+  for (var i = 0; i < list.length; i++) {
+    var node = list[i]
+    if (isVideoStream(node)) out.push(node)
+  }
+  return out
+}
+
 
 // ---------------------------------------------------------------- process
 
@@ -224,9 +260,14 @@ function statusPhrase(service) {
   if (service.inVoice) {
     // The bridge knows which call; PipeWire only knows that there is one.
     var place = callPlace(service.callChannel, service.callGuild)
+    var base = place === "" ? "In a call" : place
+    if (service.sharingScreen) {
+      return service.micLive ? base + " · sharing screen" : base + " · sharing screen · muted"
+    }
     if (place === "") return service.micLive ? "In a call" : "In a call · mic closed"
     return service.micLive ? place : place + " · muted"
   }
+  if (service.sharingScreen) return "Sharing screen"
   if (!service.hasWindow) return "Running in the background"
   if (service.workspace !== "") return "Open on workspace " + service.workspace
   return "Running"
