@@ -63,6 +63,10 @@ class RpcRejected(RpcError):
     """Discord refused one command; the connection itself is still good."""
 
 
+class AuthorizationRequired(RpcError):
+    """A user must explicitly start the Discord OAuth consent flow."""
+
+
 def clip(text, limit):
     """Shorten for a log line, marking the cut so nobody reads it as the whole input."""
     text = str(text).strip()
@@ -508,7 +512,10 @@ def session():
     rpc = Rpc(connect_socket())
     try:
         handshake(rpc, client_id)
-        token = valid_token(client_id, client_secret) or authorize(rpc, client_id, client_secret)
+        token = valid_token(client_id, client_secret)
+        if token is None:
+            raise AuthorizationRequired(
+                "Discord voice access needs setup. Use Connect in the Omarchy Discord panel.")
         rpc.request("AUTHENTICATE", {"access_token": token["access_token"]})
         Bridge(rpc).run()
     finally:
@@ -689,6 +696,9 @@ def main():
     while True:
         try:
             session()
+        except AuthorizationRequired as error:
+            emit_error(error, configured=False)
+            return EXIT_UNCONFIGURED
         except RpcError as error:
             emit_error(error)
         except Exception as error:  # keep the bridge alive; the widget shows the text
